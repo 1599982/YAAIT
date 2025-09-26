@@ -1,9 +1,6 @@
 import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
 import MonthlySalesChart from "../../components/ecommerce/MonthlySalesChart";
-import StatisticsChart from "../../components/ecommerce/StatisticsChart";
 import MonthlyTarget from "../../components/ecommerce/MonthlyTarget";
-import RecentOrders from "../../components/ecommerce/RecentOrders";
-import DemographicCard from "../../components/ecommerce/DemographicCard";
 import PageMeta from "../../components/common/PageMeta";
 
 export default function HomeBak() {
@@ -21,7 +18,8 @@ export default function HomeBak() {
         </div>
 
         <div className="col-span-12 xl:col-span-5">
-          <MonthlyTarget />
+        	<div className="h-200 rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
+        	</div>
         </div>
       </div>
     </>
