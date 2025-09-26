@@ -18,7 +18,7 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
-import HomeBak from "./pages/Dashboard/Home.bak";
+import HomeBak from "./pages/Training/Training";
 
 export default function App() {
   return (

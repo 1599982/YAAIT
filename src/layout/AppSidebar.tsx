@@ -26,11 +26,16 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
+	{
+    icon: <GridIcon />,
+    name: "Inicio",
+    path: "/"
+  },
   {
     icon: <GridIcon />,
     name: "Entrenamiento",
     subItems: [
-    	{ name: "Numeros", path: "/", pro: false },
+    	{ name: "Numeros", path: "/xxx", pro: false },
     	{ name: "Vocales", path: "/xxx", pro: false },
     	{ name: "Abecedario", path: "/yyy", pro: false },
     	{ name: "Palabras", path: "/zzz", pro: false }
