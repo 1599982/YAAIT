@@ -35,10 +35,10 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Entrenamiento",
     subItems: [
-    	{ name: "Numeros", path: "/xxx", pro: false },
-    	{ name: "Vocales", path: "/xxx", pro: false },
-    	{ name: "Abecedario", path: "/yyy", pro: false },
-    	{ name: "Palabras", path: "/zzz", pro: false }
+    	{ name: "Numeros", path: "/allenamiento/numeri", pro: false },
+    	{ name: "Vocales", path: "/allenamiento/vocales", pro: false },
+    	{ name: "Abecedario", path: "/allenamiento/abecedario", pro: false },
+    	{ name: "Palabras", path: "/allenamiento/palore", pro: false }
     ],
   },
   {

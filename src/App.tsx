@@ -18,7 +18,7 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
-import HomeBak from "./pages/Training/Training";
+import Training from "./pages/Training/Training";
 
 export default function App() {
   return (
@@ -29,9 +29,10 @@ export default function App() {
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
             <Route index path="/" element={<Home />} />
-            <Route index path="/xxx" element={<HomeBak />} />
-            <Route index path="/yyy" element={<HomeBak />} />
-            <Route index path="/zzz" element={<HomeBak />} />
+            <Route index path="/allenamiento/numeri" element={<Training type="Numeros" arr={[1, 2, 3, 4, 5, 6, 7, 8, 9]} />} />
+            <Route index path="/allenamiento/vocales" element={<Training type="Vocales" arr={["A", "E", "I", "O", "U"]} />} />
+            <Route index path="/allenamiento/abecedario" element={<Training type="Abecedario" arr={["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]} />} />
+            {/*<Route index path="/allenamiento/palore" element={<Training />} />*/}
 
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />

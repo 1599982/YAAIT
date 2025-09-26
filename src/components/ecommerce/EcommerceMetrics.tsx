@@ -1,8 +1,5 @@
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  BoxIconLine,
-  GroupIcon,
+  ArrowUpIcon
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
 import Button from "../ui/button/Button";
@@ -15,7 +12,7 @@ export default function EcommerceMetrics() {
         <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
         	<p className="flex flex-col text-xl">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
         	<div className="flex gap-2">
-         		<Button size="sm" variant="primary">Entrenar</Button>
+         		<Button size="sm" variant="primary">Prediccion</Button>
          		<Button size="sm" variant="primary">Recolectar</Button>
          	</div>
         </div>
