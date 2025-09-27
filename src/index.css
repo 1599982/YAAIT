@@ -1,5 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap")
-layer(base);
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Rampart+One&display=swap");
 
 @import "tailwindcss";
 
@@ -8,6 +8,7 @@ layer(base);
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
+  --font-rampart: "Rampart One", sans-serif;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
@@ -775,4 +776,14 @@ span.flatpickr-weekday,
 
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
+}
+
+/* Fuente para las cards */
+.rampart-font {
+  font-family: "Rampart One", sans-serif !important;
+}
+
+/* Fuente para el título principal */
+.ink-free-font {
+  font-family: "Ink Free", cursive, sans-serif !important;
 }

@@ -45,10 +45,10 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Prediccion",
     subItems: [
-    	{ name: "Numeros", path: "/", pro: false },
-    	{ name: "Vocales", path: "/xxx", pro: false },
-    	{ name: "Abecedario", path: "/yyy", pro: false },
-    	{ name: "Palabras", path: "/zzz", pro: false }
+    	{ name: "Numeros", path: "/previsione/numeri", pro: false },
+    	{ name: "Vocales", path: "/previsione/vocales", pro: false },
+    	{ name: "Abecedario", path: "/previsione/abecedario", pro: false },
+    	{ name: "Palabras", path: "/previsione/palore", pro: false }
     ],
   },
   {
