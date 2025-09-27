@@ -1,5 +1,6 @@
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
+import HandCamera from "../../components/camera/HandCamera";
 
 import {
   ArrowUpIcon
@@ -106,6 +107,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 
         <div className="col-span-12 xl:col-span-5">
         	<div className="h-200 rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
+        		<HandCamera mode="prediction" />
         	</div>
         </div>
       </div>
