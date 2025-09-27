@@ -11,7 +11,7 @@ type TrainingProps = {
 	arr: (number | string)[];
 };
 
-export default function Training({type, arr}: TrainingProps) {
+export default function Training({type, arr=[]}: TrainingProps) {
 	let folder = "";
 
 	if (type === "Numeros") {
@@ -31,7 +31,7 @@ export default function Training({type, arr}: TrainingProps) {
 	        <div className="grid grid-cols-1 gap-4 md:gap-6">
 	          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 	            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-	            	<p className="flex flex-col text-xl">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
+	            	<p className="flex flex-col text-xl dark:text-white">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
              		<div className="flex gap-2">
 			         		<Button size="sm" variant="primary">Prediccion</Button>
 			         		<Button size="sm" variant="primary">Recolectar</Button>
@@ -51,12 +51,16 @@ export default function Training({type, arr}: TrainingProps) {
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>
             <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
-				      {arr.map(val => (
-				      	<Button className="flex flex-col" size="sm" variant="outline">
-									<img className="w-14 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+				      {arr.length > 0 ? (arr.map(val => (
+				      	<Button className="w-20 h-30 flex flex-col" size="sm" variant="outline">
+									<img className="w-18 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
 				         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
 				        </Button>
-				      ))}
+				      ))) : (
+				      	<Button className="w-20 h-30 flex flex-col" size="sm" variant="outline">
+				         	<p className="text-5xl font-medium text-gray-800 dark:text-white/90">+</p>
+				        </Button>
+				      )}
             </div>
           </div>
         </div>

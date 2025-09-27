@@ -6,13 +6,15 @@ import {
 } from "../../icons";
 import Badge from "../../components/ui/badge/Badge";
 
+import { BoxIcon } from "../../icons";
+
 type TrainingProps = {
 	type: string;
 	arr: (number | string)[];
 	op: boolean;
 };
 
-export default function Predict({type, arr, op=false}: TrainingProps) {
+export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const ops = {
 		"S": "+",
 		"R": "-",
@@ -39,7 +41,7 @@ export default function Predict({type, arr, op=false}: TrainingProps) {
           <div className={`grid ${type === "Vocales" ? "" : "grid-cols-2"} md:gap-6`}>
 	          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 	            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-	            	<p className="flex flex-col text-xl">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
+	            	<p className="flex flex-col text-xl dark:text-white">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
 	            </div>
 
 	            <div className=" mt-5">
@@ -54,7 +56,7 @@ export default function Predict({type, arr, op=false}: TrainingProps) {
 							<>
 			          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 			            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-			            	<p className="flex flex-col text-xl">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
+			            	<p className="flex flex-col text-xl dark:text-white">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
 			            </div>
 
 			            <div className=" mt-5">
@@ -81,18 +83,23 @@ export default function Predict({type, arr, op=false}: TrainingProps) {
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>
             <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
-				      {arr.map(val => (
-				      	<Button className="flex flex-col" size="sm" variant="outline">
-									<img className="w-14 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
-				         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
-				        </Button>
-				      ))}
-							{op && Object.entries(ops).map(([key, value]) => (
+							{arr.length > 0 && (
+					      arr.map(val => (
+					      	<Button className="flex flex-col" size="sm" variant="outline">
+										<img className="w-14 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+					         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
+					        </Button>
+					      ))
+            	)}
+							{arr.length > 0 && op && Object.entries(ops).map(([key, value]) => (
 								<Button className="flex flex-col" size="sm" variant="outline">
 									<img className="w-14 h-18" src={`/images/letters/${key}.png`} alt="op" />
 									<p className="text-xl font-medium text-gray-800 dark:text-white/90">{value}</p>
 				        </Button>
 							))}
+							{arr.length === 0 && (
+								<p className="text-sm font-light text-gray-500">Tabla vacia :)</p>
+							)}
             </div>
           </div>
         </div>
