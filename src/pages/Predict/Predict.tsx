@@ -1,6 +1,10 @@
-import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
+
+import {
+  ArrowUpIcon
+} from "../../icons";
+import Badge from "../../components/ui/badge/Badge";
 
 type TrainingProps = {
 	type: string;
@@ -24,7 +28,21 @@ export default function Predict({type, arr}: TrainingProps) {
       />
       <div className="grid grid-cols-12 gap-4 md:gap-6">
         <div className="col-span-12 space-y-6 xl:col-span-7">
-          <EcommerceMetrics hide={true} />
+        <div className="grid grid-cols-1 gap-4 md:gap-6">
+	          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+	            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
+	            	<p className="flex flex-col text-xl">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
+	            </div>
+
+	            <div className=" mt-5">
+	              <Badge color="success">
+	                <ArrowUpIcon />
+	                11.01%
+	              </Badge>
+	              <div className="w-full h-3 bg-gray-100 rounded-xl mt-1.5"></div>
+	            </div>
+	          </div>
+	        </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>

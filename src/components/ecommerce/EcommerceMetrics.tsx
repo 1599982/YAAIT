@@ -5,10 +5,12 @@ import Badge from "../ui/badge/Badge";
 import Button from "../ui/button/Button";
 
 type EcommerceMetricsProps = {
+	title: string;
+	subtitle: string;
   hide?: boolean; // opcional
 };
 
-export default function EcommerceMetrics({hide = false}: EcommerceMetricsProps) {
+export default function EcommerceMetrics({title, subtitle, hide = false}: EcommerceMetricsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:gap-6">
       {/* <!-- Metric Item Start --> */}
