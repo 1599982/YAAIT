@@ -6,7 +6,7 @@ import {
 } from "../../icons";
 import Badge from "../../components/ui/badge/Badge";
 
-import { BoxIcon } from "../../icons";
+
 
 type TrainingProps = {
 	type: string;
@@ -86,14 +86,14 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							{arr.length > 0 && (
 					      arr.map(val => (
 					      	<Button className="flex flex-col" size="sm" variant="outline">
-										<img className="w-14 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+										<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
 					         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
 					        </Button>
 					      ))
             	)}
 							{arr.length > 0 && op && Object.entries(ops).map(([key, value]) => (
 								<Button className="flex flex-col" size="sm" variant="outline">
-									<img className="w-14 h-18" src={`/images/letters/${key}.png`} alt="op" />
+									<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/letters/${key}.png`} alt="op" />
 									<p className="text-xl font-medium text-gray-800 dark:text-white/90">{value}</p>
 				        </Button>
 							))}

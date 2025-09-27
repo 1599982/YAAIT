@@ -1,6 +1,8 @@
 import PageMeta from "../../components/common/PageMeta";
+import { useNavigate } from "react-router";
 
 export default function ProgresoAprendizaje() {
+  const navigate = useNavigate();
   return (
     <>
       <PageMeta
@@ -18,28 +20,28 @@ export default function ProgresoAprendizaje() {
           <div className="lg:col-span-2 flex items-center justify-center">
             <div className="grid grid-cols-2 gap-8">
               {/* Card ABC */}
-              <div className="bg-white rounded-3xl border-4 border-green-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
+              <div onClick={() => navigate("/allenamiento/abecedario")} className="bg-white rounded-3xl border-4 border-green-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
                 <h3 className="text-6xl font-bold text-gray-800 rampart-font">
                   abc
                 </h3>
               </div>
 
               {/* Card Vocales */}
-              <div className="bg-white rounded-3xl border-4 border-purple-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
+              <div onClick={() => navigate("/allenamiento/vocales")} className="bg-white rounded-3xl border-4 border-purple-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
                 <h3 className="text-6xl font-bold text-gray-800 rampart-font">
                   vocales
                 </h3>
               </div>
 
               {/* Card Palabras */}
-              <div className="bg-white rounded-3xl border-4 border-orange-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
+              <div onClick={() => navigate("/allenamiento/palore")} className="bg-white rounded-3xl border-4 border-orange-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
                 <h3 className="text-6xl font-bold text-gray-800 rampart-font">
                   palabras
                 </h3>
               </div>
 
               {/* Card Números */}
-              <div className="bg-white rounded-3xl border-4 border-red-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
+              <div onClick={() => navigate("/allenamiento/numeri")} className="bg-white rounded-3xl border-4 border-red-400 p-12 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-40 flex items-center justify-center">
                 <h3 className="text-6xl font-bold text-gray-800 rampart-font">
                   números
                 </h3>

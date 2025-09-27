@@ -53,7 +53,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
             <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
 				      {arr.length > 0 ? (arr.map(val => (
 				      	<Button className="w-20 h-30 flex flex-col" size="sm" variant="outline">
-									<img className="w-18 h-18" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+									<img className="w-18 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
 				         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
 				        </Button>
 				      ))) : (
