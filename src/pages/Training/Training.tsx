@@ -140,9 +140,20 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	            <div className=" mt-5">
 	              <Badge color="success">
 	                <ArrowUpIcon />
-	                11.01%
+	                {isCollecting && collectionStep === 'collecting'
+	                  ? `${Math.round(((10 - collectionTimer) / 10) * 100)}%`
+	                  : '0%'}
 	              </Badge>
-	              <div className="w-full h-3 bg-gray-100 rounded-xl mt-1.5"></div>
+	              <div className="w-full h-3 bg-gray-100 rounded-xl mt-1.5 overflow-hidden">
+	                <div
+	                  className="h-full bg-blue-500 rounded-xl transition-all duration-1000 ease-linear"
+	                  style={{
+	                    width: isCollecting && collectionStep === 'collecting'
+	                      ? `${((10 - collectionTimer) / 10) * 100}%`
+	                      : '0%'
+	                  }}
+	                ></div>
+	              </div>
 	            </div>
 	          </div>
 	        </div>
