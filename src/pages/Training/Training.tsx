@@ -1,3 +1,4 @@
+import { useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import HandCamera from "../../components/camera/HandCamera";
@@ -13,6 +14,8 @@ type TrainingProps = {
 };
 
 export default function Training({type, arr=[]}: TrainingProps) {
+	const [selectedElement, setSelectedElement] = useState<number | string | null>(null);
+
 	let folder = "";
 
 	if (type === "Numeros") {
@@ -20,6 +23,10 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	} else {
 		folder = "letters";
 	}
+
+	const handleElementSelect = (element: number | string) => {
+		setSelectedElement(element);
+	};
 
   return (
     <>
@@ -35,7 +42,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	            	<p className="flex flex-col text-xl dark:text-white">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
              		<div className="flex gap-2">
 			         		<Button size="sm" variant="primary">Prediccion</Button>
-			         		<Button size="sm" variant="primary">Recolectar</Button>
+			         		<Button size="sm" variant="primary" disabled={!selectedElement}>Recolectar</Button>
              		</div>
 	            </div>
 
@@ -53,12 +60,23 @@ export default function Training({type, arr=[]}: TrainingProps) {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>
             <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
 				      {arr.length > 0 ? (arr.map(val => (
-				      	<Button className="w-20 h-30 flex flex-col" size="sm" variant="outline">
+				      	<Button 
+				      		key={val}
+				      		className={`w-20 h-30 flex flex-col ${selectedElement === val ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`} 
+				      		size="sm" 
+				      		variant="outline"
+				      		onClick={() => handleElementSelect(val)}
+				      	>
 									<img className="w-18 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
 				         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
 				        </Button>
 				      ))) : (
-				      	<Button className="w-20 h-30 flex flex-col" size="sm" variant="outline">
+				      	<Button 
+				      		className={`w-20 h-30 flex flex-col ${selectedElement === '+' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+				      		size="sm" 
+				      		variant="outline"
+				      		onClick={() => handleElementSelect('+')}
+				      	>
 				         	<p className="text-5xl font-medium text-gray-800 dark:text-white/90">+</p>
 				        </Button>
 				      )}
