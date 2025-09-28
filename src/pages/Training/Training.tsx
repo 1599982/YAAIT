@@ -183,8 +183,8 @@ export default function Training({type, arr=[]}: TrainingProps) {
         		/>
 
         		{/* Overlay para recolección */}
-        		{isCollecting && (
-        			<div className="absolute inset-0 flex items-center justify-center z-20 rounded-2xl">
+        		{isCollecting && collectionStep !== 'collecting' && (
+        			<div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20 rounded-2xl">
         				<div className="bg-transparent rounded-xl p-8 text-center">
         					{collectionStep === 'waiting' && (
         						<div>
