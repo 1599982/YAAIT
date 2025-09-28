@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 interface HandCameraProps {
   mode: 'training' | 'prediction';
+  onHandDetected?: (detected: boolean) => void;
 }
 
 declare global {
@@ -37,12 +38,12 @@ interface MediaPipeResults {
   multiHandLandmarks?: Array<Array<{ x: number; y: number; z: number }>>;
 }
 
-const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
+const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const streamRef = useRef<MediaStream | null>(null);
   const handsRef = useRef<MediaPipeHands | null>(null);
   const animationRef = useRef<number | undefined>(undefined);
@@ -54,7 +55,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
       try {
         // Load MediaPipe
         await loadMediaPipe();
-        
+
         if (!isMounted) return;
 
         // Initialize camera
@@ -142,7 +143,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
 
       const processFrame = async (): Promise<void> => {
         if (!videoRef.current || !handsRef.current) return;
-        
+
         if (videoRef.current.readyState === 4) {
           try {
             await handsRef.current.send({ image: videoRef.current });
@@ -160,7 +161,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
     const drawResults = (results: MediaPipeResults): void => {
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      
+
       if (!canvas || !video) return;
 
       const ctx = canvas.getContext('2d');
@@ -170,11 +171,17 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
       canvas.height = video.videoHeight || 480;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.save();
       ctx.scale(-1, 1);
       ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
       ctx.restore();
+
+      // Notificar detección de manos al componente padre
+      const handsDetected = !!(results.multiHandLandmarks && results.multiHandLandmarks.length > 0);
+      if (onHandDetected) {
+        onHandDetected(handsDetected);
+      }
 
       if (results.multiHandLandmarks) {
         ctx.save();
@@ -187,7 +194,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
               color: '#00FF00',
               lineWidth: 2
             });
-            
+
             window.drawLandmarks(ctx, landmarks, {
               color: '#00FF00',
               lineWidth: 2,
@@ -208,7 +215,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
             }
           }
         }
-        
+
         ctx.restore();
       }
     };
@@ -217,15 +224,15 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
 
     return () => {
       isMounted = false;
-      
+
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      
+
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      
+
       handsRef.current = null;
     };
   }, [mode]);
@@ -239,7 +246,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
         playsInline
         style={{ display: 'none' }}
       />
-      
+
       <canvas
         ref={canvasRef}
         className="w-full h-full object-cover"
@@ -251,7 +258,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode }) => {
           <div className="text-center p-4">
             <div className="text-red-500 text-xl mb-2">⚠️</div>
             <p className="text-red-600 dark:text-red-300 text-sm">{error}</p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="mt-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
             >
