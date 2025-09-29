@@ -1,12 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from 'react';
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import HandCamera from "../../components/camera/HandCamera";
 import handLandmarksDB from "../../services/database";
-
-import {
-  ArrowUpIcon
-} from "../../icons";
+import { ArrowUpIcon } from "../../icons";
 import Badge from "../../components/ui/badge/Badge";
 
 type TrainingProps = {
@@ -21,11 +18,14 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const [predictionHistory, setPredictionHistory] = useState<Array<{prediction: string | number, confidence: number, timestamp: number}>>([]);
 	const [availableData, setAvailableData] = useState<Array<{element: string | number, count: number}>>([]);
 	const [handDetected, setHandDetected] = useState(false);
+	const [rightHandDetected, setRightHandDetected] = useState(false);
 	const [leftHandOpen, setLeftHandOpen] = useState(false);
-	const [rightHandOpen, setRightHandOpen] = useState(false);
 	const [formedText, setFormedText] = useState('');
 	const [pendingElement, setPendingElement] = useState('');
-	const [pendingTimeout, setPendingTimeout] = useState<number | null>(null);
+	const [lastLeftHandState, setLastLeftHandState] = useState<boolean | null>(null);
+	const [canInsert, setCanInsert] = useState(true);
+	const [lastValidPrediction, setLastValidPrediction] = useState<{element: string | number, confidence: number} | null>(null);
+	const validPredictionRef = useRef<{element: string | number, confidence: number} | null>(null);
 
 
 	
@@ -65,15 +65,40 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		setCurrentPrediction('');
 		setConfidence(0);
 		setPredictionHistory([]);
+		setRightHandDetected(false);
 		setLeftHandOpen(false);
-		setRightHandOpen(false);
 		setFormedText('');
 		setPendingElement('');
-		if (pendingTimeout) {
-			clearTimeout(pendingTimeout);
-			setPendingTimeout(null);
-		}
+		setLastValidPrediction(null);
+		validPredictionRef.current = null;
+		setLastLeftHandState(null);
+		setCanInsert(true);
 	}, [type]);
+
+	// Reset right hand detection state when no right hand is detected
+	useEffect(() => {
+		const resetTimer = setTimeout(() => {
+			setRightHandDetected(false);
+		}, 500); // Increased timeout to avoid clearing too quickly
+
+		return () => clearTimeout(resetTimer);
+	}, [currentPrediction]);
+
+	// Keep lastValidPrediction alive longer
+	useEffect(() => {
+		if (lastValidPrediction) {
+			console.log(`🔒 [Predict] Keeping valid prediction alive: ${lastValidPrediction.element} (${lastValidPrediction.confidence.toFixed(1)}%)`);
+			
+			// Clear after 5 seconds of inactivity instead of immediately
+			const clearTimer = setTimeout(() => {
+				console.log(`🗑️ [Predict] Clearing old valid prediction after timeout`);
+				setLastValidPrediction(null);
+				validPredictionRef.current = null;
+			}, 5000);
+
+			return () => clearTimeout(clearTimer);
+		}
+	}, [lastValidPrediction]);
 
 	const handleHandDetectionChange = useCallback((detected: boolean) => {
 		setHandDetected(detected);
@@ -82,8 +107,10 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const predictFromLandmarks = useCallback(async (currentLandmarks: Array<{ x: number; y: number; z: number }>) => {
 		// Get all training data for this category
 		const trainingData = await handLandmarksDB.getTrainingData(type);
+		console.log(`🔍 [DEBUG] Training data for ${type}:`, trainingData.length, 'entries');
 		
 		if (trainingData.length === 0) {
+			console.log(`❌ [Predict] No training data available for type: ${type}`);
 			return null;
 		}
 
@@ -136,14 +163,36 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		console.log(`🖐️ [Predict] Hand detected - Handedness: ${handedness || 'undefined'}, Landmarks: ${landmarks.length}`);
 		
 		if (landmarks.length > 0) {
-			// RIGHT HAND: Element detection (letters/numbers)
+			// RIGHT HAND: Element detection (letters/numbers) - PREDICCIÓN
 			if (handedness === 'Right') {
 				console.log(`👉 [Predict] Processing RIGHT hand for element detection`);
+				setRightHandDetected(true);
 				try {
 					const prediction = await predictFromLandmarks(landmarks);
+					console.log(`🔍 [DEBUG] Prediction result:`, prediction);
+					
 					if (prediction) {
 						setCurrentPrediction(prediction.element);
 						setConfidence(prediction.confidence);
+						console.log(`👉 [Predict] RIGHT hand prediction: ${prediction.element} (${prediction.confidence.toFixed(1)}%)`);
+						
+						// Store as last valid prediction if confidence is good
+						if (prediction.confidence >= 60) {
+							const newPrediction = {
+								element: prediction.element,
+								confidence: prediction.confidence
+							};
+							
+							if (!validPredictionRef.current || prediction.confidence > validPredictionRef.current.confidence) {
+								validPredictionRef.current = newPrediction;
+								setLastValidPrediction(newPrediction);
+								console.log(`💾 [Predict] ✅ STORED valid prediction: ${prediction.element} (${prediction.confidence.toFixed(1)}%)`);
+							} else {
+								console.log(`📋 [Predict] Keeping existing better prediction: ${validPredictionRef.current.element} (${validPredictionRef.current.confidence.toFixed(1)}%) vs new: ${prediction.element} (${prediction.confidence.toFixed(1)}%)`);
+							}
+						} else {
+							console.log(`📉 [Predict] Prediction confidence too low: ${prediction.confidence.toFixed(1)}% < 60%`);
+						}
 						
 						// Add to history only for non-word-forming modes
 						if (type !== 'Numeros' && type !== 'Abecedario') {
@@ -152,32 +201,76 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 								...prev.slice(0, 9) // Keep last 10 predictions
 							]);
 						}
+					} else {
+						console.log(`❌ [Predict] No prediction returned from predictFromLandmarks`);
 					}
 				} catch (error) {
-					console.error('Error making prediction:', error);
+					console.error('❌ [Predict] Error making prediction:', error);
 				}
+			} else {
+				console.log(`🔍 [DEBUG] Not processing RIGHT hand - handedness: ${handedness}`);
 			}
 			
-			// LEFT HAND: Open/closed control
+			// LEFT HAND: Open/closed control - CONTROL
 			if (handedness === 'Left') {
 				console.log(`👈 [Predict] Processing LEFT hand for open/closed control`);
 				const isOpen = detectHandOpenClosed(landmarks);
 				console.log(`👈 [Predict] Left hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
-				const wasOpen = leftHandOpen;
 				setLeftHandOpen(isOpen);
 				
-				// If left hand just closed and we have a good prediction, set timeout to add to text
-				if (wasOpen && !isOpen && currentPrediction && confidence >= 60 && (type === 'Numeros' || type === 'Abecedario')) {
-					if (pendingTimeout) {
-						clearTimeout(pendingTimeout);
-					}
+				// Detect hand state change (open -> closed)
+				const wasOpen = lastLeftHandState;
+				const currentValidPrediction = validPredictionRef.current;
+				
+				// Update hand state tracking
+				setLastLeftHandState(isOpen);
+				
+				// Log current state with more detail
+				const handJustClosed = (wasOpen === true && !isOpen) || (wasOpen === null && !isOpen && currentValidPrediction);
+				console.log(`🔍 [DEBUG] Hand state change detection:`, {
+					wasOpen: wasOpen,
+					isOpen: isOpen,
+					explicitTransition: wasOpen === true && !isOpen,
+					firstDetectionClosed: wasOpen === null && !isOpen && currentValidPrediction,
+					handJustClosed: handJustClosed,
+					hasValidPrediction: !!currentValidPrediction,
+					canInsert: canInsert,
+					validPredictionRef: currentValidPrediction,
+					stateTransition: `${wasOpen} → ${isOpen}`,
+					allConditionsMet: handJustClosed && currentValidPrediction && canInsert && (type === 'Numeros' || type === 'Abecedario')
+				});
+				
+				// If hand just closed (open -> closed) AND we have a valid prediction AND can insert
+				// Accept both: explicit transition (true -> false) OR first detection as closed with valid prediction
+				if (handJustClosed && currentValidPrediction && canInsert && (type === 'Numeros' || type === 'Abecedario')) {
+					console.log(`🎯 [Predict] ✅ HAND CLOSED! Inserting element: ${currentValidPrediction.element}`);
 					
-					const timeout = window.setTimeout(() => {
-						setFormedText(prev => prev + currentPrediction);
-						setPendingTimeout(null);
-					}, 1000);
+					// Insert immediately
+					setFormedText(prev => {
+						const newText = prev + currentValidPrediction.element;
+						console.log(`📝 [Predict] Text updated from "${prev}" to "${newText}"`);
+						return newText;
+					});
 					
-					setPendingTimeout(timeout);
+					// Disable further insertions until hand opens again
+					setCanInsert(false);
+					console.log(`🚫 [Predict] Insertion disabled until hand opens again`);
+					
+					// Clear the used prediction
+					validPredictionRef.current = null;
+					setLastValidPrediction(null);
+					console.log(`🏁 [Predict] Element inserted and prediction cleared`);
+				}
+				
+				// Re-enable insertion when hand opens (from any previous state)
+				if (isOpen && !canInsert) {
+					console.log(`✅ [Predict] Hand opened - insertion re-enabled`);
+					setCanInsert(true);
+				}
+				
+				// Debug log for conditions
+				if (!isOpen) {
+					console.log(`🔍 [Predict] Left hand CLOSED - Checking conditions: Prediction: ${currentPrediction}, Confidence: ${confidence}%, Type: ${type}, CanInsert: ${canInsert}`);
 				}
 			}
 			
@@ -203,8 +296,24 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 				}
 			}
 		}
-	}, [predictFromLandmarks, type, leftHandOpen, pendingTimeout, currentPrediction, confidence]);
+	}, [predictFromLandmarks, type, leftHandOpen, currentPrediction, confidence, lastValidPrediction, lastLeftHandState, canInsert]);
 
+	// Monitor state changes for debugging
+	useEffect(() => {
+		console.log(`🔄 [STATE] canInsert changed to:`, canInsert);
+	}, [canInsert]);
+
+	useEffect(() => {
+		console.log(`🔄 [STATE] lastLeftHandState changed to:`, lastLeftHandState);
+	}, [lastLeftHandState]);
+
+	useEffect(() => {
+		console.log(`🔄 [STATE] formedText changed to:`, formedText);
+	}, [formedText]);
+
+	useEffect(() => {
+		console.log(`🔄 [STATE] lastValidPrediction changed to:`, lastValidPrediction);
+	}, [lastValidPrediction]);
 
 
 	const landmarksToVectors = (landmarks: Array<{ x: number; y: number; z: number }>) => {
@@ -322,7 +431,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	            </div>
 
 	            {/* Current Prediction Display */}
-	            {currentPrediction && handDetected && confidence > 35 && (
+	            {currentPrediction && rightHandDetected && confidence > 35 && (
 	              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
 	                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
 	                  {currentPrediction}
@@ -330,6 +439,17 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	                <div className="text-sm text-gray-600 dark:text-gray-400">
 	                  Confianza: {confidence.toFixed(1)}%
 	                </div>
+	                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+	                  Mano Der: {rightHandDetected ? '✅' : '❌'} | Mano Izq: {leftHandOpen ? 'Abierta' : 'Cerrada'}
+	                </div>
+	                <div className="text-xs text-blue-500 dark:text-blue-400 mt-1">
+	                  Condiciones: Conf≥60% {confidence >= 60 ? '✅' : '❌'} | Izq Cerrada {!leftHandOpen ? '✅' : '❌'} | Tipo OK {(type === 'Numeros' || type === 'Abecedario') ? '✅' : '❌'}
+	                </div>
+	                {lastValidPrediction && (
+	                  <div className="text-xs text-green-500 dark:text-green-400 mt-1 font-bold">
+	                    💾 Predicción Válida Guardada: {lastValidPrediction.element} ({lastValidPrediction.confidence.toFixed(1)}%)
+	                  </div>
+	                )}
 	              </div>
 	            )}
 
@@ -345,7 +465,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							<>
 			          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 			            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Detección de mano abierta/cerrada</span></p>
+			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Control - Detección de mano abierta/cerrada</span></p>
 			            </div>
 
 			            <div className="mt-5 flex items-center justify-center py-8">
@@ -358,17 +478,57 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 			                </div>
 			                <div className="text-sm text-gray-500 dark:text-gray-400">
 			                  Mano Izquierda
-			                </div>
+                </div>
+                <div className="text-xs mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                  <div>Estado anterior: {lastLeftHandState === null ? 'null' : (lastLeftHandState ? 'ABIERTA' : 'CERRADA')}</div>
+                  <div>Puede insertar: {canInsert ? 'SÍ' : 'NO'}</div>
+                </div>
 			              </div>
 			            </div>
 			          </div>
-			          <div className="flex justify-between items-center col-span-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 md:gap-5">
-									<p className="text-lg font-medium text-gray-800 dark:text-white">{formedText}</p>
+			         		<div className="flex justify-between items-center col-span-full rounded-2xl border-2 border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 md:gap-5 min-h-[80px]" style={{display: 'flex', visibility: 'visible'}}>
+									<div className="flex items-center gap-3 flex-1">
+										<div className="flex items-center gap-2 min-h-[40px]">
+											<p className="text-lg font-medium text-gray-800 dark:text-white min-w-0 break-words" style={{display: 'block', visibility: 'visible'}}>
+												{formedText || (
+													<span className="text-gray-400 dark:text-gray-500 italic">
+														Texto formado aparecerá aquí... (Inserción: {canInsert ? 'Habilitada' : 'Deshabilitada'})
+													</span>
+												)}
+											</p>
+											{!canInsert && (
+												<div className="flex items-center gap-2 px-3 py-1 bg-orange-100 dark:bg-orange-900/20 rounded-full border border-orange-300">
+													<div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+													<span className="text-sm font-medium text-orange-600 dark:text-orange-400">🚫 Abrir mano</span>
+												</div>
+											)}
+										</div>
+									</div>
 									<div className="flex md:gap-3">
 										{type !== "Numeros" && (
 						      		<Button size="sm" variant="primary" onClick={() => setFormedText(prev => prev + ' ')}>Espacio</Button>
 										)}
-						      	<Button size="sm" variant="primary" onClick={() => setFormedText('')}>Borrar</Button>
+										<Button size="sm" variant="primary" onClick={() => setFormedText('')}>Borrar</Button>
+										{lastValidPrediction && (
+											<Button 
+												size="sm" 
+												variant="outline" 
+												onClick={() => {
+													console.log(`🧪 [TEST] Manual insertion with prediction: ${lastValidPrediction.element}`);
+													if (canInsert && lastValidPrediction) {
+														// Insert immediately
+														setFormedText(prev => prev + lastValidPrediction.element);
+														// Clear prediction but DON'T disable insertion for manual test
+														validPredictionRef.current = null;
+														setLastValidPrediction(null);
+														// Keep canInsert = true for manual testing
+														console.log(`🧪 [TEST] Manual insertion completed, keeping insertion enabled for testing`);
+													}
+												}}
+											>
+												Insertar: {lastValidPrediction.element}
+											</Button>
+										)}
 									</div>
 								</div>
 							</>
