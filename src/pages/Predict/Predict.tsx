@@ -21,6 +21,12 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const [predictionHistory, setPredictionHistory] = useState<Array<{prediction: string | number, confidence: number, timestamp: number}>>([]);
 	const [availableData, setAvailableData] = useState<Array<{element: string | number, count: number}>>([]);
 	const [handDetected, setHandDetected] = useState(false);
+	const [leftHandOpen, setLeftHandOpen] = useState(false);
+	const [rightHandOpen, setRightHandOpen] = useState(false);
+	const [formedText, setFormedText] = useState('');
+	const [pendingElement, setPendingElement] = useState('');
+	const [pendingTimeout, setPendingTimeout] = useState<number | null>(null);
+
 
 	
 	const ops = {
@@ -53,6 +59,21 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	useEffect(() => {
 		loadAvailableData();
 	}, [loadAvailableData]);
+
+	// Reset prediction state when type changes
+	useEffect(() => {
+		setCurrentPrediction('');
+		setConfidence(0);
+		setPredictionHistory([]);
+		setLeftHandOpen(false);
+		setRightHandOpen(false);
+		setFormedText('');
+		setPendingElement('');
+		if (pendingTimeout) {
+			clearTimeout(pendingTimeout);
+			setPendingTimeout(null);
+		}
+	}, [type]);
 
 	const handleHandDetectionChange = useCallback((detected: boolean) => {
 		setHandDetected(detected);
@@ -111,26 +132,37 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		return null;
 	}, [type]);
 
-	const handleLandmarksDetected = useCallback(async (landmarks: Array<{ x: number; y: number; z: number }>) => {
-		// Simple prediction based on stored data
+	const handleLandmarksDetected = useCallback(async (landmarks: Array<{ x: number; y: number; z: number }>, handedness?: 'Left' | 'Right') => {
 		if (landmarks.length > 0) {
-			try {
-				const prediction = await predictFromLandmarks(landmarks);
-				if (prediction) {
-					setCurrentPrediction(prediction.element);
-					setConfidence(prediction.confidence);
-					
-					// Add to history
-					setPredictionHistory(prev => [
-						{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
-						...prev.slice(0, 9) // Keep last 10 predictions
-					]);
+			// Detect right hand open/closed
+			if (handedness === 'Right') {
+				const isOpen = detectHandOpenClosed(landmarks);
+				setRightHandOpen(isOpen);
+				return; // Don't process right hand for predictions
+			}
+			
+			// Handle left hand predictions (default for single hand or left hand)
+			if (!handedness || handedness === 'Left') {
+				try {
+					const prediction = await predictFromLandmarks(landmarks);
+					if (prediction) {
+						setCurrentPrediction(prediction.element);
+						setConfidence(prediction.confidence);
+						
+						// Add to history only for non-word-forming modes
+						if (type !== 'Numeros' && type !== 'Abecedario') {
+							setPredictionHistory(prev => [
+								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
+								...prev.slice(0, 9) // Keep last 10 predictions
+							]);
+						}
+					}
+				} catch (error) {
+					console.error('Error making prediction:', error);
 				}
-			} catch (error) {
-				console.error('Error making prediction:', error);
 			}
 		}
-	}, [predictFromLandmarks]);
+	}, [predictFromLandmarks, type]);
 
 
 
@@ -247,22 +279,21 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							<>
 			          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 			            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-			            	<p className="flex flex-col text-xl dark:text-white">Historial de predicciones<span className="text-sm font-light text-gray-500">Últimas predicciones realizadas</span></p>
+			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Derecha<span className="text-sm font-light text-gray-500">Detección de mano abierta/cerrada</span></p>
 			            </div>
 
-			            <div className="mt-5 space-y-2 max-h-32 overflow-y-auto">
-			              {predictionHistory.length > 0 ? (
-			                predictionHistory.map((pred, index) => (
-			                  <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-			                    <span className="font-medium text-gray-800 dark:text-white">{pred.prediction}</span>
-			                    <span className="text-sm text-gray-600 dark:text-gray-400">{pred.confidence.toFixed(1)}%</span>
-			                  </div>
-			                ))
-			              ) : (
-			                <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-			                  No hay predicciones aún
+			            <div className="mt-5 flex items-center justify-center py-8">
+			              <div className="text-center">
+			                <div className={`text-6xl mb-4 ${rightHandOpen ? 'text-green-500' : 'text-red-500'}`}>
+			                  {rightHandOpen ? '✋' : '✊'}
 			                </div>
-			              )}
+			                <div className={`text-2xl font-bold mb-2 ${rightHandOpen ? 'text-green-600' : 'text-red-600'}`}>
+			                  {rightHandOpen ? 'ABIERTA' : 'CERRADA'}
+			                </div>
+			                <div className="text-sm text-gray-500 dark:text-gray-400">
+			                  Mano Derecha
+			                </div>
+			              </div>
 			            </div>
 			          </div>
 			          <div className="flex justify-between items-center col-span-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 md:gap-5">

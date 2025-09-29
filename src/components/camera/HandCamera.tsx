@@ -209,7 +209,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
         ctx.translate(-canvas.width, 0);
 
         // Dibujar conexiones de manos
-        for (const landmarks of results.multiHandLandmarks) {
+        results.multiHandLandmarks.forEach((landmarks, index) => {
           // Conexiones de MediaPipe para manos
           const HAND_CONNECTIONS = [
             [0, 1], [1, 2], [2, 3], [3, 4], // Pulgar
@@ -220,8 +220,14 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
             [5, 9], [9, 13], [13, 17] // Conexiones entre dedos
           ];
 
+          // Determinar el color según la mano
+          const handedness = results.multiHandedness?.[index]?.label;
+          const isRightHand = handedness === 'Right';
+          const connectionColor = isRightHand ? '#0066FF' : '#00FF00'; // Azul para mano derecha, verde para izquierda
+          const landmarkColor = isRightHand ? '#0044BB' : '#FF0000'; // Azul oscuro para mano derecha, rojo para izquierda
+
           // Dibujar conexiones
-          ctx.strokeStyle = '#00FF00';
+          ctx.strokeStyle = connectionColor;
           ctx.lineWidth = 2;
           for (const [start, end] of HAND_CONNECTIONS) {
             const startPoint = landmarks[start];
@@ -234,7 +240,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
           }
 
           // Dibujar puntos de landmarks
-          ctx.fillStyle = '#FF0000';
+          ctx.fillStyle = landmarkColor;
           for (const landmark of landmarks) {
             ctx.beginPath();
             ctx.arc(
@@ -244,7 +250,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
             );
             ctx.fill();
           }
-        }
+        });
 
         ctx.restore();
       }
