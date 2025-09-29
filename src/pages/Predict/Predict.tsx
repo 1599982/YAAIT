@@ -136,15 +136,37 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		console.log(`🖐️ [Predict] Hand detected - Handedness: ${handedness || 'undefined'}, Landmarks: ${landmarks.length}`);
 		
 		if (landmarks.length > 0) {
-			// Always detect right hand open/closed status
+			// RIGHT HAND: Element detection (letters/numbers)
 			if (handedness === 'Right') {
-				console.log(`👉 [Predict] Processing RIGHT hand`);
+				console.log(`👉 [Predict] Processing RIGHT hand for element detection`);
+				try {
+					const prediction = await predictFromLandmarks(landmarks);
+					if (prediction) {
+						setCurrentPrediction(prediction.element);
+						setConfidence(prediction.confidence);
+						
+						// Add to history only for non-word-forming modes
+						if (type !== 'Numeros' && type !== 'Abecedario') {
+							setPredictionHistory(prev => [
+								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
+								...prev.slice(0, 9) // Keep last 10 predictions
+							]);
+						}
+					}
+				} catch (error) {
+					console.error('Error making prediction:', error);
+				}
+			}
+			
+			// LEFT HAND: Open/closed control
+			if (handedness === 'Left') {
+				console.log(`👈 [Predict] Processing LEFT hand for open/closed control`);
 				const isOpen = detectHandOpenClosed(landmarks);
-				console.log(`👉 [Predict] Right hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
-				const wasOpen = rightHandOpen;
-				setRightHandOpen(isOpen);
+				console.log(`👈 [Predict] Left hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
+				const wasOpen = leftHandOpen;
+				setLeftHandOpen(isOpen);
 				
-				// If right hand just closed and we have a good prediction, set timeout to add to text
+				// If left hand just closed and we have a good prediction, set timeout to add to text
 				if (wasOpen && !isOpen && currentPrediction && confidence >= 60 && (type === 'Numeros' || type === 'Abecedario')) {
 					if (pendingTimeout) {
 						clearTimeout(pendingTimeout);
@@ -157,58 +179,31 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 					
 					setPendingTimeout(timeout);
 				}
-				
-				// Also handle predictions for right hand (element detection)
-				try {
-					const prediction = await predictFromLandmarks(landmarks);
-					if (prediction) {
-						setCurrentPrediction(prediction.element);
-						setConfidence(prediction.confidence);
-						
-						// Add to history only for non-word-forming modes
-						if (type !== 'Numeros' && type !== 'Abecedario') {
-							setPredictionHistory(prev => [
-								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
-								...prev.slice(0, 9) // Keep last 10 predictions
-							]);
-						}
-					}
-				} catch (error) {
-					console.error('Error making prediction:', error);
-				}
 			}
 			
-			// Handle predictions for left hand or single hand mode (backup)
-			if (!handedness || handedness === 'Left') {
-				console.log(`👈 [Predict] Processing LEFT hand or single hand mode`);
-				try {
-					const prediction = await predictFromLandmarks(landmarks);
-					if (prediction) {
-						setCurrentPrediction(prediction.element);
-						setConfidence(prediction.confidence);
-						
-						// Add to history only for non-word-forming modes
-						if (type !== 'Numeros' && type !== 'Abecedario') {
-							setPredictionHistory(prev => [
-								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
-								...prev.slice(0, 9) // Keep last 10 predictions
-							]);
-						}
-					}
-				} catch (error) {
-					console.error('Error making prediction:', error);
-				}
-			}
-			
-			// If no handedness detected, try to detect right hand state anyway
+			// SINGLE HAND MODE: Process as right hand for element detection
 			if (!handedness) {
-				console.log(`❓ [Predict] No handedness detected, trying to detect hand state anyway`);
-				const isOpen = detectHandOpenClosed(landmarks);
-				console.log(`❓ [Predict] Single hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
-				setRightHandOpen(isOpen);
+				console.log(`❓ [Predict] Single hand mode - treating as RIGHT hand`);
+				try {
+					const prediction = await predictFromLandmarks(landmarks);
+					if (prediction) {
+						setCurrentPrediction(prediction.element);
+						setConfidence(prediction.confidence);
+						
+						// Add to history only for non-word-forming modes
+						if (type !== 'Numeros' && type !== 'Abecedario') {
+							setPredictionHistory(prev => [
+								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
+								...prev.slice(0, 9) // Keep last 10 predictions
+							]);
+						}
+					}
+				} catch (error) {
+					console.error('Error making prediction:', error);
+				}
 			}
 		}
-	}, [predictFromLandmarks, type, rightHandOpen, pendingTimeout, currentPrediction, confidence]);
+	}, [predictFromLandmarks, type, leftHandOpen, pendingTimeout, currentPrediction, confidence]);
 
 
 
@@ -350,19 +345,19 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							<>
 			          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 			            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Derecha<span className="text-sm font-light text-gray-500">Detección de mano abierta/cerrada</span></p>
+			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Detección de mano abierta/cerrada</span></p>
 			            </div>
 
 			            <div className="mt-5 flex items-center justify-center py-8">
 			              <div className="text-center">
-			                <div className={`text-6xl mb-4 ${rightHandOpen ? 'text-green-500' : 'text-red-500'}`}>
-			                  {rightHandOpen ? '✋' : '✊'}
+			                <div className={`text-6xl mb-4 ${leftHandOpen ? 'text-green-500' : 'text-red-500'}`}>
+			                  {leftHandOpen ? '✋' : '✊'}
 			                </div>
-			                <div className={`text-2xl font-bold mb-2 ${rightHandOpen ? 'text-green-600' : 'text-red-600'}`}>
-			                  {rightHandOpen ? 'ABIERTA' : 'CERRADA'}
+			                <div className={`text-2xl font-bold mb-2 ${leftHandOpen ? 'text-green-600' : 'text-red-600'}`}>
+			                  {leftHandOpen ? 'ABIERTA' : 'CERRADA'}
 			                </div>
 			                <div className="text-sm text-gray-500 dark:text-gray-400">
-			                  Mano Derecha
+			                  Mano Izquierda
 			                </div>
 			              </div>
 			            </div>

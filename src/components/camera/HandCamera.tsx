@@ -185,8 +185,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.restore();
 
       // Notificar detección de manos al componente padre
@@ -214,8 +213,6 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
 
       if (results.multiHandLandmarks) {
         ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-canvas.width, 0);
 
         // Dibujar conexiones de manos
         results.multiHandLandmarks.forEach((landmarks, index) => {
@@ -232,8 +229,8 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
           // Determinar el color según la mano
           const handedness = results.multiHandedness?.[index]?.label;
           const isRightHand = handedness === 'Right';
-          const connectionColor = isRightHand ? '#0066FF' : '#00FF00'; // Azul para mano derecha, verde para izquierda
-          const landmarkColor = isRightHand ? '#0044BB' : '#FF0000'; // Azul oscuro para mano derecha, rojo para izquierda
+          const connectionColor = isRightHand ? '#0066FF' : '#00AA00'; // Azul para mano derecha (elementos), verde para izquierda (control)
+          const landmarkColor = isRightHand ? '#0044BB' : '#008800'; // Azul oscuro para mano derecha, verde oscuro para izquierda
 
           // Dibujar conexiones
           ctx.strokeStyle = connectionColor;
