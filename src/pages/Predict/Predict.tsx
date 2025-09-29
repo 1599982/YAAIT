@@ -15,13 +15,11 @@ type TrainingProps = {
 export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const [currentPrediction, setCurrentPrediction] = useState<string | number>('');
 	const [confidence, setConfidence] = useState(0);
-	const [predictionHistory, setPredictionHistory] = useState<Array<{prediction: string | number, confidence: number, timestamp: number}>>([]);
 	const [availableData, setAvailableData] = useState<Array<{element: string | number, count: number}>>([]);
 	const [handDetected, setHandDetected] = useState(false);
 	const [rightHandDetected, setRightHandDetected] = useState(false);
 	const [leftHandOpen, setLeftHandOpen] = useState(false);
 	const [formedText, setFormedText] = useState('');
-	const [pendingElement, setPendingElement] = useState('');
 	const [lastLeftHandState, setLastLeftHandState] = useState<boolean | null>(null);
 	const [canInsert, setCanInsert] = useState(true);
 	const [hasInsertedInThisCycle, setHasInsertedInThisCycle] = useState(false);
@@ -38,6 +36,35 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		"D": "/",
 		"I": "="
 	};
+
+	// Function to evaluate mathematical expressions safely
+	const evaluateExpression = (expression: string): string => {
+		try {
+			// Replace 'x' with '*' for JavaScript evaluation
+			const jsExpression = expression.replace(/x/g, '*');
+			
+			// Basic validation: only allow numbers, +, -, *, /, (, ), and spaces
+			if (!/^[0-9+\-*/().\s]+$/.test(jsExpression)) {
+				console.warn(`⚠️ [Math] Invalid characters in expression: ${expression}`);
+				return expression; // Return original if invalid
+			}
+			
+			// Evaluate the expression
+			const result = Function(`"use strict"; return (${jsExpression})`)();
+			
+			// Check if result is a valid number
+			if (typeof result === 'number' && !isNaN(result)) {
+				console.log(`🧮 [Math] Evaluated "${expression}" = ${result}`);
+				return result.toString();
+			} else {
+				console.warn(`⚠️ [Math] Invalid result for expression: ${expression}`);
+				return expression;
+			}
+		} catch (error) {
+			console.error(`❌ [Math] Error evaluating expression "${expression}":`, error);
+			return expression; // Return original expression if evaluation fails
+		}
+	};
 	let folder = "";
 
 	if (type === "Numeros") {
@@ -49,9 +76,26 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const loadAvailableData = useCallback(async () => {
 		try {
 			const stats = await handLandmarksDB.getTrainingStats();
-			const categoryData = stats
+			let categoryData = stats
 				.filter(stat => stat.category === type)
 				.map(stat => ({ element: stat.element, count: stat.count }));
+			
+			// For Numeros, also include operator letters (S, R, M, D) from Abecedario and (I) from Vocales
+			if (type === 'Numeros') {
+				const operatorLetters = ['S', 'R', 'M', 'D'];
+				const operatorData = stats
+					.filter(stat => stat.category === 'Abecedario' && operatorLetters.includes(stat.element.toString()))
+					.map(stat => ({ element: stat.element, count: stat.count }));
+				
+				// Also include "I" (equals) from Vocales
+				const equalsData = stats
+					.filter(stat => stat.category === 'Vocales' && stat.element.toString() === 'I')
+					.map(stat => ({ element: stat.element, count: stat.count }));
+				
+				categoryData = [...categoryData, ...operatorData, ...equalsData];
+				console.log(`🔤 [Predict] Added ${operatorData.length} operator letters from Abecedario and ${equalsData.length} equals from Vocales`);
+			}
+			
 			setAvailableData(categoryData);
 		} catch (error) {
 			console.error('Error loading available data:', error);
@@ -66,11 +110,9 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	useEffect(() => {
 		setCurrentPrediction('');
 		setConfidence(0);
-		setPredictionHistory([]);
 		setRightHandDetected(false);
 		setLeftHandOpen(false);
 		setFormedText('');
-		setPendingElement('');
 		setLastValidPrediction(null);
 		validPredictionRef.current = null;
 		setLastLeftHandState(null);
@@ -110,7 +152,26 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 
 	const predictFromLandmarks = useCallback(async (currentLandmarks: Array<{ x: number; y: number; z: number }>) => {
 		// Get all training data for this category
-		const trainingData = await handLandmarksDB.getTrainingData(type);
+		let trainingData = await handLandmarksDB.getTrainingData(type);
+		
+		// For Numeros, also include operator letters (S, R, M, D) from Abecedario and (I) from Vocales
+		if (type === 'Numeros') {
+			const operatorLetters = ['S', 'R', 'M', 'D'];
+			const abecedarioData = await handLandmarksDB.getTrainingData('Abecedario');
+			const operatorData = abecedarioData.filter(record => 
+				operatorLetters.includes(record.element.toString())
+			);
+			
+			// Also include "I" (equals) from Vocales
+			const vocalesData = await handLandmarksDB.getTrainingData('Vocales');
+			const equalsData = vocalesData.filter(record => 
+				record.element.toString() === 'I'
+			);
+			
+			trainingData = [...trainingData, ...operatorData, ...equalsData];
+			console.log(`🔤 [Predict] Added ${operatorData.length} operator training samples from Abecedario and ${equalsData.length} equals from Vocales`);
+		}
+		
 		console.log(`🔍 [DEBUG] Training data for ${type}:`, trainingData.length, 'entries');
 		
 		if (trainingData.length === 0) {
@@ -198,13 +259,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							console.log(`📉 [Predict] Prediction confidence too low: ${prediction.confidence.toFixed(1)}% < 60%`);
 						}
 						
-						// Add to history only for non-word-forming modes
-						if (type !== 'Numeros' && type !== 'Abecedario') {
-							setPredictionHistory(prev => [
-								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
-								...prev.slice(0, 9) // Keep last 10 predictions
-							]);
-						}
+						// Prediction processed successfully
 					} else {
 						console.log(`❌ [Predict] No prediction returned from predictFromLandmarks`);
 					}
@@ -246,19 +301,33 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 					currentHasInserted: currentHasInserted,
 					validPredictionRef: currentValidPrediction,
 					stateTransition: `${wasOpen} → ${isOpen}`,
-					allConditionsMet: handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario')
+					allConditionsMet: handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario' || type === 'Vocales')
 				});
 				
 				// If hand just closed (open -> closed) AND we have a valid prediction AND can insert AND haven't inserted in this cycle
 				// Accept both: explicit transition (true -> false) OR first detection as closed with valid prediction
-				if (handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario')) {
+				if (handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario' || type === 'Vocales')) {
 					console.log(`🎯 [Predict] ✅ HAND CLOSED! Inserting element: ${currentValidPrediction.element}`);
 					
-					// Insert immediately
+					// Insert immediately (convert operators if needed, evaluate if equals)
 					setFormedText(prev => {
-						const newText = prev + currentValidPrediction.element;
-						console.log(`📝 [Predict] Text updated from "${prev}" to "${newText}"`);
-						return newText;
+						// If it's "I" (equals), evaluate the current expression
+						if (currentValidPrediction.element === 'I') {
+							if (prev.trim()) {
+								const result = evaluateExpression(prev);
+								console.log(`📝 [Predict] Evaluated expression "${prev}" = "${result}"`);
+								return result;
+							} else {
+								console.warn(`⚠️ [Predict] Cannot evaluate empty expression`);
+								return prev;
+							}
+						} else {
+							// Normal insertion with operator conversion
+							const elementToInsert = ops[currentValidPrediction.element as keyof typeof ops] || currentValidPrediction.element;
+							const newText = prev + elementToInsert;
+							console.log(`📝 [Predict] Text updated from "${prev}" to "${newText}" (original: ${currentValidPrediction.element}, converted: ${elementToInsert})`);
+							return newText;
+						}
 					});
 					
 					// Mark as inserted in this cycle to prevent multiple insertions
@@ -297,13 +366,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 						setCurrentPrediction(prediction.element);
 						setConfidence(prediction.confidence);
 						
-						// Add to history only for non-word-forming modes
-						if (type !== 'Numeros' && type !== 'Abecedario') {
-							setPredictionHistory(prev => [
-								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
-								...prev.slice(0, 9) // Keep last 10 predictions
-							]);
-						}
+						// Prediction processed successfully
 					}
 				} catch (error) {
 					console.error('Error making prediction:', error);
@@ -535,8 +598,24 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 												onClick={() => {
 													console.log(`🧪 [TEST] Manual insertion with prediction: ${lastValidPrediction.element}`);
 													if (canInsert && lastValidPrediction) {
-														// Insert immediately
-														setFormedText(prev => prev + lastValidPrediction.element);
+														// Insert immediately (convert operators if needed, evaluate if equals)
+														setFormedText(prev => {
+															// If it's "I" (equals), evaluate the current expression
+															if (lastValidPrediction.element === 'I') {
+																if (prev.trim()) {
+																	const result = evaluateExpression(prev);
+																	console.log(`🧪 [TEST] Evaluated expression "${prev}" = "${result}"`);
+																	return result;
+																} else {
+																	console.warn(`⚠️ [TEST] Cannot evaluate empty expression`);
+																	return prev;
+																}
+															} else {
+																// Normal insertion with operator conversion
+																const elementToInsert = ops[lastValidPrediction.element as keyof typeof ops] || lastValidPrediction.element;
+																return prev + elementToInsert;
+															}
+														});
 														// Clear prediction but DON'T disable insertion for manual test
 														validPredictionRef.current = null;
 														setLastValidPrediction(null);
@@ -556,21 +635,55 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>
-            <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
+            <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full custom-scrollbar">
 							{arr.length > 0 && (
-					      arr.map(val => (
-					      	<Button className="flex flex-col" size="sm" variant="outline">
-										<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
-					         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
-					        </Button>
-					      ))
+					      arr.map(val => {
+					      	const isCurrentPrediction = currentPrediction == val || currentPrediction === val.toString() || currentPrediction.toString() === val.toString();
+					      	// Debug log for numbers highlighting
+					      	if (type === 'Numeros') {
+					      		console.log(`🔍 [Highlight Debug] val: ${val} (${typeof val}), currentPrediction: ${currentPrediction} (${typeof currentPrediction}), isCurrentPrediction: ${isCurrentPrediction}`);
+					      	}
+					      	return (
+						      	<div
+						      		key={val}
+						      		className={`
+						      			flex flex-col items-center justify-center
+						      			px-3 py-2 text-sm font-medium
+						      			border rounded-md cursor-pointer
+						      			transition-colors duration-200
+						      			${isCurrentPrediction 
+						      				? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500' 
+						      				: 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+						      			}
+						      		`}
+						      	>
+											<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+						         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
+						        </div>
+					        );
+					      })
             	)}
-							{arr.length > 0 && op && Object.entries(ops).map(([key, value]) => (
-								<Button className="flex flex-col" size="sm" variant="outline">
-									<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/letters/${key}.png`} alt="op" />
-									<p className="text-xl font-medium text-gray-800 dark:text-white/90">{value}</p>
-				        </Button>
-							))}
+							{arr.length > 0 && op && Object.entries(ops).map(([key, value]) => {
+								const isCurrentPrediction = currentPrediction == key || currentPrediction === key.toString() || currentPrediction.toString() === key.toString();
+								return (
+									<div
+										key={key}
+										className={`
+											flex flex-col items-center justify-center
+											px-3 py-2 text-sm font-medium
+											border rounded-md cursor-pointer
+											transition-colors duration-200
+											${isCurrentPrediction 
+												? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500' 
+												: 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+											}
+										`}
+									>
+										<img className="w-14 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/letters/${key}.png`} alt="op" />
+										<p className="text-xl font-medium text-gray-800 dark:text-white/90">{value}</p>
+					        </div>
+				        );
+							})}
 							{arr.length === 0 && (
 								<p className="text-sm font-light text-gray-500">Tabla vacia :)</p>
 							)}
@@ -592,12 +705,17 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
         		<div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
         			<h4 className="text-sm font-semibold text-gray-800 dark:text-white mb-2">Datos disponibles:</h4>
         			<div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-        				{availableData.map(item => (
-        					<div key={item.element} className="flex justify-between">
-        						<span>{item.element}:</span>
-        						<span>{item.count} muestras</span>
-        					</div>
-        				))}
+        				{availableData.map(item => {
+        					const displayElement = ops[item.element as keyof typeof ops] 
+        						? `${item.element} (${ops[item.element as keyof typeof ops]})` 
+        						: item.element;
+        					return (
+        						<div key={item.element} className="flex justify-between">
+        							<span>{displayElement}:</span>
+        							<span>{item.count} muestras</span>
+        						</div>
+        					);
+        				})}
         			</div>
         		</div>
         	)}

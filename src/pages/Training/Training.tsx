@@ -26,6 +26,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	const [collectedSamples, setCollectedSamples] = useState(0);
 	const [sessionId, setSessionId] = useState('');
 	const [showDataVerification, setShowDataVerification] = useState(false);
+	const [trainedElements, setTrainedElements] = useState<Set<string | number>>(new Set());
 
 	let folder = "";
 
@@ -34,6 +35,26 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	} else {
 		folder = "letters";
 	}
+
+	// Load trained elements when component mounts or type changes
+	useEffect(() => {
+		const loadTrainedElements = async () => {
+			try {
+				const stats = await handLandmarksDB.getTrainingStats();
+				const trained = new Set(
+					stats
+						.filter(stat => stat.category === type)
+						.map(stat => stat.element)
+				);
+				setTrainedElements(trained);
+				console.log(`📊 [Training] Loaded ${trained.size} trained elements for ${type}:`, Array.from(trained));
+			} catch (error) {
+				console.error('❌ [Training] Error loading trained elements:', error);
+			}
+		};
+
+		loadTrainedElements();
+	}, [type]);
 
 	const handleElementSelect = (element: number | string) => {
 		setSelectedElement(element);
@@ -162,6 +183,8 @@ export default function Training({type, arr=[]}: TrainingProps) {
 					
 					if (elementData.length > 0) {
 						console.log(`✅ Guardadas ${elementData[0].count} muestras para ${type}-${selectedElement}`);
+						// Update trained elements set
+						setTrainedElements(prev => new Set([...prev, selectedElement!]));
 					}
 				} catch (error) {
 					console.error('Error verificando datos:', error);
@@ -252,7 +275,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 			         		</Button>
 			         		<Button
 			         			size="sm"
-			         			variant="secondary"
+			         			variant="outline"
 			         			onClick={async () => {
 			         				console.log("🧪 Testing database functionality...");
 			         				try {
@@ -331,19 +354,36 @@ export default function Training({type, arr=[]}: TrainingProps) {
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{type}</h3>
-            <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full overflow-x-auto custom-scrollbar">
-				      {arr.length > 0 ? (arr.map(val => (
-				      	<Button
-				      		key={val}
-				      		className={`w-20 h-30 flex flex-col ${selectedElement === val ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
-				      		size="sm"
-				      		variant="outline"
-				      		onClick={() => handleElementSelect(val)}
-				      	>
-									<img className="w-18 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
-				         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
-				        </Button>
-				      ))) : (
+            <div className="flex flex-wrap justify-between gap-3 mt-5 max-w-full custom-scrollbar">
+				      {arr.length > 0 ? (arr.map(val => {
+				      	const isTrained = trainedElements.has(val);
+				      	const isSelected = selectedElement === val;
+				      	return (
+					      	<Button
+					      		key={val}
+					      		className={`w-20 h-30 flex flex-col relative ${
+					      			isSelected 
+					      				? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+					      				: isTrained 
+					      					? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' 
+					      					: ''
+					      		}`}
+					      		size="sm"
+					      		variant="outline"
+					      		onClick={() => handleElementSelect(val)}
+					      	>
+					      		{isTrained && (
+					      			<div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+					      				<svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+					      					<path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+					      				</svg>
+					      			</div>
+					      		)}
+										<img className="w-18 h-18 dark:[filter:invert(100%)_sepia(0%)_saturate(7466%)_hue-rotate(83deg)_brightness(99%)_contrast(102%)]" src={`/images/${folder}/${val}.png`} alt={`${val}`} />
+					         	<p className="text-xl font-medium text-gray-800 dark:text-white/90">{val}</p>
+					        </Button>
+				        );
+				      })) : (
 				      	<Button
 				      		className={`w-20 h-30 flex flex-col ${selectedElement === '+' ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
 				      		size="sm"
