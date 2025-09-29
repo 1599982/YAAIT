@@ -25,7 +25,12 @@ class HandLandmarksDatabase {
 	private db: IDBDatabase | null = null;
 
 	constructor() {
-		this.initDB();
+		this.initDB().then(() => {
+			// Auto-load database from public file after initialization
+			this.loadDatabaseFromPublicFile().catch(error => {
+				console.warn("⚠️ [DB] Auto-load failed, continuing with empty database:", error);
+			});
+		});
 	}
 
 	private async initDB(): Promise<void> {
@@ -440,6 +445,214 @@ class HandLandmarksDatabase {
 		} catch (error) {
 			console.error("❌ [DB] Error verifying database status:", error);
 			return { isValid: false, objectStores: [], error: String(error) };
+		}
+	}
+
+	async exportDatabase(): Promise<string> {
+		console.log("📤 [DB] Starting database export...");
+		await this.ensureDB();
+
+		try {
+			// Get all training data
+			const allData = await this.getTrainingData();
+			
+			// Create export object with metadata
+			const exportData = {
+				version: this.version,
+				exportDate: new Date().toISOString(),
+				dbName: this.dbName,
+				totalRecords: allData.length,
+				data: allData
+			};
+
+			console.log(`✅ [DB] Export completed: ${allData.length} records`);
+			return JSON.stringify(exportData, null, 2);
+		} catch (error) {
+			console.error("❌ [DB] Error exporting database:", error);
+			throw error;
+		}
+	}
+
+	async downloadDatabase(): Promise<void> {
+		try {
+			const exportData = await this.exportDatabase();
+			
+			// Create blob and download
+			const blob = new Blob([exportData], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `yaait-database-${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			
+			URL.revokeObjectURL(url);
+			console.log("✅ [DB] Database downloaded successfully");
+		} catch (error) {
+			console.error("❌ [DB] Error downloading database:", error);
+			throw error;
+		}
+	}
+
+	async importDatabase(jsonData: string): Promise<{
+		success: boolean;
+		imported: number;
+		error?: string;
+	}> {
+		console.log("📥 [DB] Starting database import...");
+		
+		try {
+			const importData = JSON.parse(jsonData);
+			
+			// Validate import data structure
+			if (!importData.data || !Array.isArray(importData.data)) {
+				throw new Error("Invalid import data format");
+			}
+
+			console.log(`🔍 [DB] Import data validation:`, {
+				version: importData.version,
+				exportDate: importData.exportDate,
+				totalRecords: importData.totalRecords,
+				actualRecords: importData.data.length
+			});
+
+			await this.ensureDB();
+
+			// Clear existing data (optional - you might want to merge instead)
+			await this.deleteTrainingData();
+			console.log("🗑️ [DB] Cleared existing data");
+
+			// Import records one by one
+			let importedCount = 0;
+			for (const record of importData.data) {
+				try {
+					// Remove the id field to let IndexedDB auto-generate new ones
+					const { id, ...recordWithoutId } = record;
+					
+					await new Promise<void>((resolve, reject) => {
+						if (!this.db) {
+							reject(new Error("Database not initialized"));
+							return;
+						}
+
+						const transaction = this.db.transaction(["trainingData"], "readwrite");
+						const store = transaction.objectStore("trainingData");
+						const request = store.add(recordWithoutId);
+
+						request.onsuccess = () => {
+							importedCount++;
+							resolve();
+						};
+
+						request.onerror = () => {
+							console.warn(`⚠️ [DB] Failed to import record:`, record);
+							resolve(); // Continue with other records
+						};
+					});
+				} catch (error) {
+					console.warn(`⚠️ [DB] Error importing record:`, error);
+				}
+			}
+
+			console.log(`✅ [DB] Import completed: ${importedCount}/${importData.data.length} records imported`);
+			
+			return {
+				success: true,
+				imported: importedCount
+			};
+
+		} catch (error) {
+			console.error("❌ [DB] Error importing database:", error);
+			return {
+				success: false,
+				imported: 0,
+				error: String(error)
+			};
+		}
+	}
+
+	async importFromFile(file: File): Promise<{
+		success: boolean;
+		imported: number;
+		error?: string;
+	}> {
+		return new Promise((resolve) => {
+			const reader = new FileReader();
+			
+			reader.onload = async (e) => {
+				try {
+					const jsonData = e.target?.result as string;
+					const result = await this.importDatabase(jsonData);
+					resolve(result);
+				} catch (error) {
+					console.error("❌ [DB] Error reading file:", error);
+					resolve({
+						success: false,
+						imported: 0,
+						error: String(error)
+					});
+				}
+			};
+
+			reader.onerror = () => {
+				resolve({
+					success: false,
+					imported: 0,
+					error: "Error reading file"
+				});
+			};
+
+			reader.readAsText(file);
+		});
+	}
+
+	async loadDatabaseFromPublicFile(): Promise<{
+		success: boolean;
+		imported: number;
+		error?: string;
+	}> {
+		console.log("🔄 [DB] Loading database from public file...");
+		
+		try {
+			// Check if database already has data
+			const currentSize = await this.getDatabaseSize();
+			if (currentSize > 0) {
+				console.log(`📊 [DB] Database already has ${currentSize} records, skipping auto-load`);
+				return {
+					success: true,
+					imported: 0,
+					error: "Database already populated"
+				};
+			}
+
+			// Fetch the JSON file from public folder
+			const response = await fetch('/yaait-database-2025-09-29.json');
+			
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+
+			const jsonData = await response.text();
+			console.log("📥 [DB] Successfully fetched database file");
+
+			// Import the data
+			const result = await this.importDatabase(jsonData);
+			
+			if (result.success) {
+				console.log(`✅ [DB] Auto-loaded ${result.imported} records from public file`);
+			}
+
+			return result;
+
+		} catch (error) {
+			console.error("❌ [DB] Error loading database from public file:", error);
+			return {
+				success: false,
+				imported: 0,
+				error: String(error)
+			};
 		}
 	}
 }

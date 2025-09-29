@@ -63,7 +63,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	};
 
 	const handleCollectClick = async () => {
-		if (selectedElement) {
+		if (selectedElement !== null) {
 			// Verify database status before starting collection
 			const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
 			
@@ -198,7 +198,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 			dataCollectionInterval = setInterval(async () => {
 				const landmarks = currentLandmarksRef.current;
 				
-				if (landmarks.length > 0 && selectedElement && sessionId) {
+				if (landmarks.length > 0 && selectedElement !== null && sessionId) {
 					try {
 						const landmarksCopy = landmarks.map(l => ({...l}));
 						
@@ -279,7 +279,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 			         		<Button
 			         			size="sm"
 			         			variant="primary"
-			         			disabled={!selectedElement}
+			         			disabled={selectedElement === null}
 			         			onClick={handleCollectClick}
 			         		>
 			         			Recolectar

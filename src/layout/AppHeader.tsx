@@ -98,7 +98,7 @@ const AppHeader: React.FC = () => {
           {isTeacher && (
             <button
               onClick={async () => {
-                if (window.confirm('¿Estás seguro de que quieres resetear completamente la base de datos? Esto eliminará todos los datos de entrenamiento.')) {
+                if (window.confirm('¿Estás seguro de que quieres resetear completamente la base de datos? Esto eliminará todos los datos de entrenamiento y recargará desde el archivo.')) {
                   try {
                     console.log('🔄 Resetting database...');
                     
@@ -109,17 +109,21 @@ const AppHeader: React.FC = () => {
                     // Wait for deletion to complete
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     
-                    // Reinitialize
+                    // Reinitialize and auto-load
                     await handLandmarksDB.ensureDB();
                     console.log('✅ Database recreated');
+                    
+                    // Auto-load from public file
+                    const loadResult = await handLandmarksDB.loadDatabaseFromPublicFile();
+                    console.log('📥 Auto-load result:', loadResult);
                     
                     // Verify it worked
                     const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
                     console.log('📊 New database status:', dbStatus);
                     
                     if (dbStatus.isValid) {
-                      console.log('🎉 Database reset completed successfully');
-                      alert('Base de datos reseteada exitosamente! Ahora puedes entrenar elementos.');
+                      console.log('🎉 Database reset and reload completed successfully');
+                      alert(`Base de datos reseteada y recargada exitosamente! ${loadResult.imported} registros cargados.`);
                       // Reload the page to refresh all data
                       window.location.reload();
                     } else {
