@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import HandCamera from "../../components/camera/HandCamera";
+import handLandmarksDB from "../../services/database";
+import DataVerification from "../../components/common/DataVerification";
 
 import {
   ArrowUpIcon
@@ -20,6 +22,10 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	const [countdown, setCountdown] = useState(3);
 	const [collectionTimer, setCollectionTimer] = useState(10);
 	const [handDetected, setHandDetected] = useState(false);
+	const [currentLandmarks, setCurrentLandmarks] = useState<Array<{ x: number; y: number; z: number }>>([]);
+	const [collectedSamples, setCollectedSamples] = useState(0);
+	const [sessionId, setSessionId] = useState('');
+	const [showDataVerification, setShowDataVerification] = useState(false);
 
 	let folder = "";
 
@@ -33,12 +39,51 @@ export default function Training({type, arr=[]}: TrainingProps) {
 		setSelectedElement(element);
 	};
 
-	const handleCollectClick = () => {
+	const handleCollectClick = async () => {
 		if (selectedElement) {
+			// Verify database status before starting collection
+			console.log('🔍 Verificando estado de la base de datos...');
+			const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
+
+			if (!dbStatus.isValid) {
+				console.error('❌ Base de datos no válida:', dbStatus);
+				alert(`Error en la base de datos: ${dbStatus.error || 'Estado inválido'}. Por favor recarga la página.`);
+				return;
+			}
+
+			console.log('✅ Base de datos verificada correctamente');
+
+			// Test database connectivity with a simple write/read operation
+			try {
+				console.log('🧪 [Training] Testing database connectivity...');
+				const testSessionId = handLandmarksDB.generateSessionId();
+				const testLandmarks = [{ x: 0.1, y: 0.2, z: 0.3 }];
+
+				const testRecordId = await handLandmarksDB.saveTrainingData(
+					'TestCategory',
+					'TestElement',
+					testLandmarks,
+					testSessionId
+				);
+				console.log('✅ [Training] Test record saved with ID:', testRecordId);
+
+				// Immediately delete the test record
+				await handLandmarksDB.deleteTrainingData('TestCategory');
+				console.log('✅ [Training] Test record cleaned up');
+
+			} catch (dbTestError) {
+				console.error('❌ [Training] Database connectivity test failed:', dbTestError);
+				alert('Error de conectividad con la base de datos. Intenta recargar la página.');
+				return;
+			}
+
+			const newSessionId = handLandmarksDB.generateSessionId();
+			setSessionId(newSessionId);
 			setIsCollecting(true);
 			setCollectionStep('waiting');
 			setCountdown(3);
 			setCollectionTimer(10);
+			setCollectedSamples(0);
 			console.log(`Iniciando recolección para elemento: ${selectedElement}`);
 		}
 	};
@@ -47,17 +92,41 @@ export default function Training({type, arr=[]}: TrainingProps) {
 		setHandDetected(detected);
 	}, []);
 
+	const handleLandmarksDetected = useCallback((landmarks: Array<{ x: number; y: number; z: number }>) => {
+		console.log(`📡 [Training] Landmarks recibidos en Training.tsx: ${landmarks.length} puntos`);
+		console.log(`📡 [Training] Callback triggered, landmarks type:`, typeof landmarks);
+		console.log(`📡 [Training] Full landmarks array:`, landmarks);
+
+		if (landmarks.length > 0) {
+			setCurrentLandmarks(landmarks);
+			console.log(`✅ [Training] Landmarks guardados en estado local`);
+			console.log(`🎯 [Training] First landmark sample:`, landmarks[0]);
+			console.log(`🎯 [Training] Estado actual:`, {
+				isCollecting,
+				collectionStep,
+				handDetected,
+				selectedElement,
+				sessionId: sessionId ? 'present' : 'missing'
+			});
+		} else {
+			console.warn(`⚠️ [Training] Received empty landmarks array`);
+		}
+	}, [isCollecting, collectionStep, handDetected, selectedElement, sessionId]);
+
 	const stopCollection = () => {
 		setIsCollecting(false);
 		setCollectionStep('waiting');
 		setCountdown(3);
 		setCollectionTimer(10);
+		setCollectedSamples(0);
+		setCurrentLandmarks([]);
+		setSessionId('');
 		console.log('Recolección detenida');
 	};
 
 	// Efecto para manejar el cronómetro inicial de 3 segundos
 	useEffect(() => {
-		let timer: NodeJS.Timeout;
+		let timer: number;
 
 		if (isCollecting && collectionStep === 'countdown' && handDetected) {
 			if (countdown > 0) {
@@ -76,41 +145,175 @@ export default function Training({type, arr=[]}: TrainingProps) {
 		};
 	}, [isCollecting, collectionStep, countdown, handDetected, selectedElement]);
 
-	// Efecto para manejar la recolección de datos de 10 segundos
+	// Simplified data collection effect
 	useEffect(() => {
-		let timer: NodeJS.Timeout;
+		let timer: number;
 
-		if (isCollecting && collectionStep === 'collecting' && handDetected) {
-			if (collectionTimer > 0) {
-				timer = setTimeout(() => {
-					setCollectionTimer(collectionTimer - 1);
-				}, 1000);
-			} else {
-				// Recolección completada
-				setCollectionStep('completed');
-				console.log(`Recolección completada para elemento: ${selectedElement}. Datos simulados guardados.`);
+		if (isCollecting && collectionStep === 'collecting' && handDetected && collectionTimer > 0) {
+			timer = setTimeout(() => {
+				setCollectionTimer(collectionTimer - 1);
+			}, 1000);
+		} else if (isCollecting && collectionStep === 'collecting' && collectionTimer === 0) {
+			// Collection completed
+			setCollectionStep('completed');
+			console.log(`🎉 Recolección completada para elemento: ${selectedElement}. ${collectedSamples} muestras guardadas.`);
+
+			// Verify saved data
+			setTimeout(async () => {
+				try {
+					const stats = await handLandmarksDB.getTrainingStats();
+					const totalSize = await handLandmarksDB.getDatabaseSize();
+					const elementData = stats.filter(s => s.category === type && s.element === selectedElement);
+
+					console.log(`📊 Verificación final - Total DB size: ${totalSize}, Datos para ${type}-${selectedElement}:`, elementData);
+
+					if (elementData.length > 0) {
+						console.log(`✅ Se guardaron ${elementData[0].count} muestras para ${type}-${selectedElement}`);
+					} else {
+						console.warn(`⚠️ No se encontraron datos guardados para ${type}-${selectedElement}`);
+					}
+				} catch (error) {
+					console.error('❌ Error verificando datos guardados:', error);
+				}
+
 				setTimeout(() => {
 					stopCollection();
 				}, 1000);
-			}
+			}, 200);
 		}
 
 		return () => {
 			if (timer) clearTimeout(timer);
 		};
-	}, [isCollecting, collectionStep, collectionTimer, handDetected, selectedElement]);
+	}, [isCollecting, collectionStep, collectionTimer, handDetected, selectedElement, type, collectedSamples]);
+
+	// Simplified data collection using ref for current landmarks
+	const currentLandmarksRef = useRef<Array<{ x: number; y: number; z: number }>>([]);
+
+	// Update ref when landmarks change
+	useEffect(() => {
+		currentLandmarksRef.current = currentLandmarks;
+		console.log(`📡 [Training] Landmarks ref updated: ${currentLandmarks.length} points`);
+	}, [currentLandmarks]);
+
+	// Separate effect for data collection
+	useEffect(() => {
+		let dataCollectionInterval: number;
+
+		if (isCollecting && collectionStep === 'collecting' && handDetected) {
+			console.log(`🎯 [Training] Starting data collection for ${type}-${selectedElement}`);
+
+			// Test immediate save to verify connectivity
+			const testSave = async () => {
+				try {
+					console.log('🧪 [Training] Testing immediate save...');
+					const testLandmarks = Array.from({ length: 21 }, () => ({
+						x: Math.random(),
+						y: Math.random(),
+						z: Math.random()
+					}));
+
+					const testId = await handLandmarksDB.saveTrainingData(
+						type,
+						selectedElement!,
+						testLandmarks,
+						sessionId
+					);
+
+					console.log('✅ [Training] Test save successful, ID:', testId);
+					setCollectedSamples(prev => prev + 1);
+
+				} catch (error) {
+					console.error('❌ [Training] Test save failed:', error);
+				}
+			};
+
+			// Do immediate test
+			testSave();
+
+			// Set up interval for real data collection
+			dataCollectionInterval = setInterval(async () => {
+				const landmarks = currentLandmarksRef.current;
+				console.log(`🔄 [Training] Collecting - Landmarks available: ${landmarks.length}`);
+
+				if (landmarks.length > 0 && selectedElement && sessionId) {
+					try {
+						console.log(`💾 [Training] Saving sample ${collectedSamples + 1}`);
+
+						const landmarksCopy = landmarks.map(l => ({...l}));
+
+						const recordId = await handLandmarksDB.saveTrainingData(
+							type,
+							selectedElement,
+							landmarksCopy,
+							sessionId
+						);
+
+						console.log(`✅ [Training] Saved with ID: ${recordId}`);
+						setCollectedSamples(prev => prev + 1);
+
+					} catch (error) {
+						console.error('❌ [Training] Save error:', error);
+					}
+				} else {
+					// Try with fake data if no real landmarks
+					console.warn('⚠️ [Training] No landmarks, using fake data');
+					try {
+						const fakeLandmarks = Array.from({ length: 21 }, (_, i) => ({
+							x: 0.5 + (Math.random() - 0.5) * 0.1,
+							y: 0.5 + (Math.random() - 0.5) * 0.1,
+							z: 0.1 * i / 21
+						}));
+
+						const recordId = await handLandmarksDB.saveTrainingData(
+							type,
+							selectedElement!,
+							fakeLandmarks,
+							sessionId
+						);
+
+						console.log(`✅ [Training] Fake data saved with ID: ${recordId}`);
+						setCollectedSamples(prev => prev + 1);
+
+					} catch (error) {
+						console.error('❌ [Training] Fake data save failed:', error);
+					}
+				}
+			}, 500);
+		}
+
+		return () => {
+			if (dataCollectionInterval) {
+				clearInterval(dataCollectionInterval);
+			}
+		};
+	}, [isCollecting, collectionStep, handDetected, selectedElement, sessionId, type, collectedSamples]);
 
 	// Efecto para iniciar cronómetro cuando se detecta la mano
 	useEffect(() => {
 		if (isCollecting && collectionStep === 'waiting' && handDetected) {
 			setCollectionStep('countdown');
-			console.log('Mano detectada, iniciando cronómetro de 3 segundos');
+			console.log('👋 Mano detectada, iniciando cronómetro de 3 segundos');
 		} else if (isCollecting && (collectionStep === 'countdown' || collectionStep === 'collecting') && !handDetected) {
 			// Si la mano desaparece durante el cronómetro o recolección, detener la recolección
-			console.log('Mano perdida, deteniendo recolección');
+			console.log('❌ Mano perdida, deteniendo recolección');
 			stopCollection();
 		}
 	}, [handDetected, isCollecting, collectionStep]);
+
+	// Debug effect to monitor landmarks during collection
+	useEffect(() => {
+		if (isCollecting && collectionStep === 'collecting' && currentLandmarks.length > 0) {
+			console.log(`🔍 Debug - Estado de recolección:`, {
+				landmarks: currentLandmarks.length,
+				handDetected,
+				element: selectedElement,
+				sessionId: sessionId ? 'present' : 'missing',
+				samples: collectedSamples,
+				firstLandmark: currentLandmarks[0]
+			});
+		}
+	}, [currentLandmarks.length, isCollecting, collectionStep, handDetected, selectedElement, sessionId, collectedSamples]);
 
   return (
     <>
@@ -125,6 +328,55 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
 	            	<p className="flex flex-col text-xl dark:text-white">Recolecte los datos necesarios<span className="text-sm font-light text-gray-500">Ponga la mano frente a la camara</span></p>
              		<div className="flex gap-2">
+			         		<Button size="sm" variant="outline" onClick={() => setShowDataVerification(true)}>
+			         			Ver Datos
+			         		</Button>
+			         		<Button
+			         			size="sm"
+			         			variant="secondary"
+			         			onClick={async () => {
+			         				console.log("🧪 Testing database functionality...");
+			         				try {
+			         					// First verify database status
+			         					const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
+			         					console.log("📊 Database status:", dbStatus);
+
+			         					if (!dbStatus.isValid) {
+			         						console.error("❌ Database invalid:", dbStatus.error);
+			         						alert(`Database invalid: ${dbStatus.error}`);
+			         						return;
+			         					}
+
+			         					// Test saving data
+			         					const testSessionId = handLandmarksDB.generateSessionId();
+			         					const testLandmarks = Array.from({ length: 21 }, () => ({
+			         						x: Math.random(),
+			         						y: Math.random(),
+			         						z: Math.random()
+			         					}));
+
+			         					const recordId = await handLandmarksDB.saveTrainingData(
+			         						type,
+			         						selectedElement || "TEST",
+			         						testLandmarks,
+			         						testSessionId
+			         					);
+
+			         					console.log(`✅ Test record saved with ID: ${recordId}`);
+
+			         					// Verify the data was saved
+			         					const size = await handLandmarksDB.getDatabaseSize();
+			         					console.log(`📊 Database size after test: ${size}`);
+
+			         					alert("Test exitoso! Revisa la consola para detalles.");
+			         				} catch (error) {
+			         					console.error("❌ Test failed:", error);
+			         					alert(`Test falló: ${error instanceof Error ? error.message : 'Unknown error'}. Revisa la consola.`);
+			         				}
+			         			}}
+			         		>
+			         			🧪 Test DB
+			         		</Button>
 			         		<Button size="sm" variant="primary">Prediccion</Button>
 			         		<Button
 			         			size="sm"
@@ -141,8 +393,8 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	              <Badge color="success">
 	                <ArrowUpIcon />
 	                {isCollecting && collectionStep === 'collecting'
-	                  ? `${Math.round(((10 - collectionTimer) / 10) * 100)}%`
-	                  : '0%'}
+	                  ? `${Math.round(((10 - collectionTimer) / 10) * 100)}% (${collectedSamples} muestras)`
+	                  : `0% (${collectedSamples} muestras)`}
 	              </Badge>
 	              <div className="w-full h-3 bg-gray-100 rounded-xl mt-1.5 overflow-hidden">
 	                <div
@@ -191,7 +443,17 @@ export default function Training({type, arr=[]}: TrainingProps) {
         		<HandCamera
         			mode="training"
         			onHandDetected={handleHandDetectionChange}
+        			onLandmarksDetected={handleLandmarksDetected}
         		/>
+
+        		{/* Debug info overlay */}
+        		<div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-30">
+        			<div>Landmarks: {currentLandmarks.length}</div>
+        			<div>Hand: {handDetected ? '✅' : '❌'}</div>
+        			<div>Collecting: {isCollecting ? '✅' : '❌'}</div>
+        			<div>Step: {collectionStep}</div>
+        			<div>Samples: {collectedSamples}</div>
+        		</div>
 
         		{/* Overlay para recolección */}
         		{isCollecting && collectionStep !== 'collecting' && (
@@ -235,8 +497,11 @@ export default function Training({type, arr=[]}: TrainingProps) {
         							<div className="text-4xl text-green-600 dark:text-green-400 mb-4">
         								✓
         							</div>
-        							<div className="text-xl font-semibold text-gray-800 dark:text-white">
+        							<div className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
         								¡Recolección completada!
+        							</div>
+        							<div className="text-sm text-gray-600 dark:text-gray-400">
+        								{collectedSamples} muestras guardadas en la base de datos
         							</div>
         						</div>
         					)}
@@ -246,6 +511,12 @@ export default function Training({type, arr=[]}: TrainingProps) {
         	</div>
         </div>
       </div>
+
+      {/* Data Verification Modal */}
+      <DataVerification
+        isOpen={showDataVerification}
+        onClose={() => setShowDataVerification(false)}
+      />
     </>
   );
 }

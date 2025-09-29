@@ -17,7 +17,7 @@ import FormElements from "./pages/Forms/FormElements";
 import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
-import Home from "./pages/Dashboard/Home";
+
 import Training from "./pages/Training/Training";
 import Predict from "./pages/Predict/Predict";
 import ProgresoAprendizaje from "./pages/Dashboard/ProgresoAprendizaje";
@@ -34,12 +34,12 @@ export default function App() {
             <Route index path="/allenamiento/numeri" element={<Training type="Numeros" arr={[1, 2, 3, 4, 5, 6, 7, 8, 9]} />} />
             <Route index path="/allenamiento/vocales" element={<Training type="Vocales" arr={["A", "E", "I", "O", "U"]} />} />
             <Route index path="/allenamiento/abecedario" element={<Training type="Abecedario" arr={["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]} />} />
-            <Route index path="/allenamiento/palore" element={<Training type="Palabras" />} />
+            <Route index path="/allenamiento/palore" element={<Training type="Palabras" arr={[]} />} />
 
             <Route index path="/previsione/numeri" element={<Predict type="Numeros" arr={[1, 2, 3, 4, 5, 6, 7, 8, 9]} op={true} />} />
             <Route index path="/previsione/vocales" element={<Predict type="Vocales" arr={["A", "E", "I", "O", "U"]} />} />
             <Route index path="/previsione/abecedario" element={<Predict type="Abecedario" arr={["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]} />} />
-            <Route index path="/previsione/palore" element={<Predict type="Palabras" />} />
+            <Route index path="/previsione/palore" element={<Predict type="Palabras" arr={[]} />} />
 
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />
