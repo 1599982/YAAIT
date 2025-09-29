@@ -15,6 +15,12 @@ export default defineConfig({
     }),
   ],
   server: {
-    allowedHosts: ['*']
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '8rzoad-ip-161-132-54-35.tunnelmole.net',
+      '.tunnelmole.net'
+    ],
+    host: true
   }
 });
