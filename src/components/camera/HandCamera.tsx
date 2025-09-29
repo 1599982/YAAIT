@@ -321,12 +321,6 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
         </div>
       )}
       
-      {/* Debug info */}
-      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-20">
-        <div>MediaPipe: {mediaPipeLoaded ? '✅' : '⏳'}</div>
-        <div>Camera: {isReady ? '✅' : '⏳'}</div>
-        <div>Processing: {isProcessing ? '🔄' : '⏸️'}</div>
-      </div>
     </div>
   );
 };

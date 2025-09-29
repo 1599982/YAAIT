@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import HandCamera from "../../components/camera/HandCamera";
@@ -16,6 +17,7 @@ type TrainingProps = {
 };
 
 export default function Training({type, arr=[]}: TrainingProps) {
+	const navigate = useNavigate();
 	const [selectedElement, setSelectedElement] = useState<number | string | null>(null);
 	const [isCollecting, setIsCollecting] = useState(false);
 	const [collectionStep, setCollectionStep] = useState<'waiting' | 'countdown' | 'collecting' | 'completed'>('waiting');
@@ -273,53 +275,25 @@ export default function Training({type, arr=[]}: TrainingProps) {
 			         		<Button size="sm" variant="outline" onClick={() => setShowDataVerification(true)}>
 			         			Ver Datos
 			         		</Button>
-			         		<Button
-			         			size="sm"
-			         			variant="outline"
-			         			onClick={async () => {
-			         				console.log("🧪 Testing database functionality...");
-			         				try {
-			         					// First verify database status
-			         					const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
-			         					console.log("📊 Database status:", dbStatus);
-
-			         					if (!dbStatus.isValid) {
-			         						console.error("❌ Database invalid:", dbStatus.error);
-			         						alert(`Database invalid: ${dbStatus.error}`);
-			         						return;
-			         					}
-
-			         					// Test saving data
-			         					const testSessionId = handLandmarksDB.generateSessionId();
-			         					const testLandmarks = Array.from({ length: 21 }, () => ({
-			         						x: Math.random(),
-			         						y: Math.random(),
-			         						z: Math.random()
-			         					}));
-
-			         					const recordId = await handLandmarksDB.saveTrainingData(
-			         						type,
-			         						selectedElement || "TEST",
-			         						testLandmarks,
-			         						testSessionId
-			         					);
-
-			         					console.log(`✅ Test record saved with ID: ${recordId}`);
-
-			         					// Verify the data was saved
-			         					const size = await handLandmarksDB.getDatabaseSize();
-			         					console.log(`📊 Database size after test: ${size}`);
-
-			         					alert("Test exitoso! Revisa la consola para detalles.");
-			         				} catch (error) {
-			         					console.error("❌ Test failed:", error);
-			         					alert(`Test falló: ${error instanceof Error ? error.message : 'Unknown error'}. Revisa la consola.`);
+			         		<Button 
+			         			size="sm" 
+			         			variant="primary"
+			         			onClick={() => {
+			         				// Navigate to corresponding prediction page
+			         				const routes = {
+			         					'Numeros': '/previsione/numeri',
+			         					'Vocales': '/previsione/vocales', 
+			         					'Abecedario': '/previsione/abecedario',
+			         					'Palabras': '/previsione/palore'
+			         				};
+			         				const route = routes[type as keyof typeof routes];
+			         				if (route) {
+			         					navigate(route);
 			         				}
 			         			}}
 			         		>
-			         			🧪 Test DB
+			         			Predicción
 			         		</Button>
-			         		<Button size="sm" variant="primary">Prediccion</Button>
 			         		<Button
 			         			size="sm"
 			         			variant="primary"
@@ -405,14 +379,6 @@ export default function Training({type, arr=[]}: TrainingProps) {
         			onLandmarksDetected={handleLandmarksDetected}
         		/>
 
-        		{/* Debug info overlay */}
-        		<div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-30">
-        			<div>Landmarks: {currentLandmarks.length}</div>
-        			<div>Hand: {handDetected ? '✅' : '❌'}</div>
-        			<div>Collecting: {isCollecting ? '✅' : '❌'}</div>
-        			<div>Step: {collectionStep}</div>
-        			<div>Samples: {collectedSamples}</div>
-        		</div>
 
         		{/* Overlay para recolección */}
         		{isCollecting && collectionStep !== 'collecting' && (
