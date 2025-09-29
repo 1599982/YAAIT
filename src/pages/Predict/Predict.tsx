@@ -108,6 +108,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 
 	// Reset prediction state when type changes
 	useEffect(() => {
+		console.log(`🔄 [Predict] Type changed to: ${type} - Resetting all state`);
 		setCurrentPrediction('');
 		setConfidence(0);
 		setRightHandDetected(false);
@@ -119,7 +120,10 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		setCanInsert(true);
 		setHasInsertedInThisCycle(false);
 		hasInsertedRef.current = false;
-	}, [type]);
+		
+		// Force reload of available data
+		loadAvailableData();
+	}, [type, loadAvailableData]);
 
 	// Reset right hand detection state when no right hand is detected
 	useEffect(() => {
@@ -173,6 +177,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		}
 		
 		console.log(`🔍 [DEBUG] Training data for ${type}:`, trainingData.length, 'entries');
+		console.log(`🔍 [DEBUG] Categories in training data:`, [...new Set(trainingData.map(d => d.category))]);
 		
 		if (trainingData.length === 0) {
 			console.log(`❌ [Predict] No training data available for type: ${type}`);
@@ -639,10 +644,6 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							{arr.length > 0 && (
 					      arr.map(val => {
 					      	const isCurrentPrediction = currentPrediction == val || currentPrediction === val.toString() || currentPrediction.toString() === val.toString();
-					      	// Debug log for numbers highlighting
-					      	if (type === 'Numeros') {
-					      		console.log(`🔍 [Highlight Debug] val: ${val} (${typeof val}), currentPrediction: ${currentPrediction} (${typeof currentPrediction}), isCurrentPrediction: ${isCurrentPrediction}`);
-					      	}
 					      	return (
 						      	<div
 						      		key={val}
@@ -694,6 +695,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
         <div className="col-span-12 xl:col-span-5">
         	<div className="h-200 rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/[0.03]">
         		<HandCamera 
+        			key={`predict-${type}`}
         			mode="prediction" 
         			onHandDetected={handleHandDetectionChange}
         			onLandmarksDetected={handleLandmarksDetected}
