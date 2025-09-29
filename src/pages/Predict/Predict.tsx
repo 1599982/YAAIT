@@ -24,6 +24,8 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	const [pendingElement, setPendingElement] = useState('');
 	const [lastLeftHandState, setLastLeftHandState] = useState<boolean | null>(null);
 	const [canInsert, setCanInsert] = useState(true);
+	const [hasInsertedInThisCycle, setHasInsertedInThisCycle] = useState(false);
+	const hasInsertedRef = useRef(false);
 	const [lastValidPrediction, setLastValidPrediction] = useState<{element: string | number, confidence: number} | null>(null);
 	const validPredictionRef = useRef<{element: string | number, confidence: number} | null>(null);
 
@@ -73,6 +75,8 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		validPredictionRef.current = null;
 		setLastLeftHandState(null);
 		setCanInsert(true);
+		setHasInsertedInThisCycle(false);
+		hasInsertedRef.current = false;
 	}, [type]);
 
 	// Reset right hand detection state when no right hand is detected
@@ -160,7 +164,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	}, [type]);
 
 	const handleLandmarksDetected = useCallback(async (landmarks: Array<{ x: number; y: number; z: number }>, handedness?: 'Left' | 'Right') => {
-		console.log(`🖐️ [Predict] Hand detected - Handedness: ${handedness || 'undefined'}, Landmarks: ${landmarks.length}`);
+		console.log(`🖐️ [Predict] Hand detected - Handedness: ${handedness || 'undefined'}, Landmarks: ${landmarks.length}, hasInsertedInThisCycle: ${hasInsertedInThisCycle}`);
 		
 		if (landmarks.length > 0) {
 			// RIGHT HAND: Element detection (letters/numbers) - PREDICCIÓN
@@ -225,6 +229,9 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 				// Update hand state tracking
 				setLastLeftHandState(isOpen);
 				
+				// Use ref for current cycle state
+				const currentHasInserted = hasInsertedRef.current;
+				
 				// Log current state with more detail
 				const handJustClosed = (wasOpen === true && !isOpen) || (wasOpen === null && !isOpen && currentValidPrediction);
 				console.log(`🔍 [DEBUG] Hand state change detection:`, {
@@ -235,14 +242,16 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 					handJustClosed: handJustClosed,
 					hasValidPrediction: !!currentValidPrediction,
 					canInsert: canInsert,
+					hasInsertedInThisCycle: hasInsertedInThisCycle,
+					currentHasInserted: currentHasInserted,
 					validPredictionRef: currentValidPrediction,
 					stateTransition: `${wasOpen} → ${isOpen}`,
-					allConditionsMet: handJustClosed && currentValidPrediction && canInsert && (type === 'Numeros' || type === 'Abecedario')
+					allConditionsMet: handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario')
 				});
 				
-				// If hand just closed (open -> closed) AND we have a valid prediction AND can insert
+				// If hand just closed (open -> closed) AND we have a valid prediction AND can insert AND haven't inserted in this cycle
 				// Accept both: explicit transition (true -> false) OR first detection as closed with valid prediction
-				if (handJustClosed && currentValidPrediction && canInsert && (type === 'Numeros' || type === 'Abecedario')) {
+				if (handJustClosed && currentValidPrediction && canInsert && !currentHasInserted && (type === 'Numeros' || type === 'Abecedario')) {
 					console.log(`🎯 [Predict] ✅ HAND CLOSED! Inserting element: ${currentValidPrediction.element}`);
 					
 					// Insert immediately
@@ -252,9 +261,11 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 						return newText;
 					});
 					
-					// Disable further insertions until hand opens again
-					setCanInsert(false);
-					console.log(`🚫 [Predict] Insertion disabled until hand opens again`);
+					// Mark as inserted in this cycle to prevent multiple insertions
+					console.log(`🔄 [BEFORE] hasInsertedInThisCycle: ${currentHasInserted} → setting to true`);
+					hasInsertedRef.current = true;
+					setHasInsertedInThisCycle(true);
+					console.log(`🚫 [Predict] Marked as inserted in this cycle - no more insertions until hand opens`);
 					
 					// Clear the used prediction
 					validPredictionRef.current = null;
@@ -263,9 +274,12 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 				}
 				
 				// Re-enable insertion when hand opens (from any previous state)
-				if (isOpen && !canInsert) {
-					console.log(`✅ [Predict] Hand opened - insertion re-enabled`);
-					setCanInsert(true);
+				console.log(`🔍 [RESET CHECK] isOpen: ${isOpen}, hasInsertedInThisCycle: ${hasInsertedInThisCycle}, currentHasInserted: ${currentHasInserted}, shouldReset: ${isOpen && currentHasInserted}`);
+				if (isOpen && currentHasInserted) {
+					console.log(`✅ [Predict] Hand opened - resetting insertion cycle`);
+					console.log(`🔄 [BEFORE RESET] hasInsertedInThisCycle: ${currentHasInserted} → setting to false`);
+					hasInsertedRef.current = false;
+					setHasInsertedInThisCycle(false);
 				}
 				
 				// Debug log for conditions
@@ -306,6 +320,10 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	useEffect(() => {
 		console.log(`🔄 [STATE] lastLeftHandState changed to:`, lastLeftHandState);
 	}, [lastLeftHandState]);
+
+	useEffect(() => {
+		console.log(`🔄 [STATE] hasInsertedInThisCycle changed to:`, hasInsertedInThisCycle, `(timestamp: ${Date.now()})`);
+	}, [hasInsertedInThisCycle]);
 
 	useEffect(() => {
 		console.log(`🔄 [STATE] formedText changed to:`, formedText);
@@ -482,6 +500,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
                 <div className="text-xs mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
                   <div>Estado anterior: {lastLeftHandState === null ? 'null' : (lastLeftHandState ? 'ABIERTA' : 'CERRADA')}</div>
                   <div>Puede insertar: {canInsert ? 'SÍ' : 'NO'}</div>
+                  <div>Ciclo completado: {hasInsertedInThisCycle ? 'SÍ' : 'NO'}</div>
                 </div>
 			              </div>
 			            </div>
