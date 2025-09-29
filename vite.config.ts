@@ -9,10 +9,12 @@ export default defineConfig({
     svgr({
       svgrOptions: {
         icon: true,
-        // This will transform your SVG to a React component
         exportType: "named",
         namedExport: "ReactComponent",
       },
     }),
   ],
+  server: {
+    allowedHosts: ['*']
+  }
 });
