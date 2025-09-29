@@ -540,7 +540,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 						<>
 					<div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
 					<div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-						<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Control - Detección de mano abierta/cerrada</span></p>
+						<p className="flex flex-col text-xl dark:text-white">Estado Mano derecha<span className="text-sm font-light text-gray-500">Control - Detección de mano abierta/cerrada</span></p>
 					</div>
 
 					<div className="mt-5 flex items-center justify-center py-8">
@@ -552,7 +552,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 							{leftHandOpen ? 'ABIERTA' : 'CERRADA'}
 						</div>
 						<div className="text-sm text-gray-500 dark:text-gray-400">
-							Mano Izquierda
+							Mano derecha
 			</div>
 
 			              </div>
