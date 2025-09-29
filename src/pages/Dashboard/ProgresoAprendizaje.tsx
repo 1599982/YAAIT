@@ -2,6 +2,8 @@ import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import handLandmarksDB, { DatabaseStats } from "../../services/database";
+import Chart from "react-apexcharts";
+import { ApexOptions } from "apexcharts";
 
 export default function ProgresoAprendizaje() {
   const navigate = useNavigate();
@@ -374,6 +376,153 @@ ${dbStatus.error ? `Error: ${dbStatus.error}` : ''}
             🔍 Verificar Estado
           </button>
         </div>
+
+        {/* Charts Section */}
+        {dbStats.length > 0 && (
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Line Chart - Progress over time */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                📈 Progreso de Entrenamiento por Categoría
+              </h3>
+              <Chart
+                options={{
+                  chart: {
+                    fontFamily: "Outfit, sans-serif",
+                    height: 350,
+                    type: "line",
+                    toolbar: { show: false },
+                  },
+                  colors: ["#465FFF", "#10B981", "#F59E0B", "#EF4444"],
+                  stroke: {
+                    curve: "smooth",
+                    width: 3,
+                  },
+                  xaxis: {
+                    categories: ['Números', 'Vocales', 'Abecedario', 'Palabras'],
+                    labels: {
+                      style: {
+                        colors: "#6B7280",
+                        fontSize: "12px",
+                      },
+                    },
+                  },
+                  yaxis: {
+                    title: {
+                      text: "Muestras de Entrenamiento",
+                      style: {
+                        color: "#6B7280",
+                      },
+                    },
+                    labels: {
+                      style: {
+                        colors: "#6B7280",
+                      },
+                    },
+                  },
+                  grid: {
+                    borderColor: "#E5E7EB",
+                  },
+                  legend: {
+                    position: "top",
+                    horizontalAlign: "right",
+                  },
+                  tooltip: {
+                    y: {
+                      formatter: (value: number) => `${value} muestras`,
+                    },
+                  },
+                } as ApexOptions}
+                series={[
+                  {
+                    name: "Total de Muestras",
+                    data: ['Numeros', 'Vocales', 'Abecedario', 'Palabras'].map(category => {
+                      const categoryStats = dbStats.filter(stat => stat.category === category);
+                      return categoryStats.reduce((sum, stat) => sum + stat.count, 0);
+                    }),
+                  },
+                ]}
+                type="line"
+                height={350}
+              />
+            </div>
+
+            {/* Bar Chart - Elements trained per category */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                📊 Elementos Entrenados por Categoría
+              </h3>
+              <Chart
+                options={{
+                  chart: {
+                    fontFamily: "Outfit, sans-serif",
+                    type: "bar",
+                    height: 350,
+                    toolbar: { show: false },
+                  },
+                  colors: ["#465FFF"],
+                  plotOptions: {
+                    bar: {
+                      horizontal: false,
+                      columnWidth: "55%",
+                      borderRadius: 8,
+                      borderRadiusApplication: "end",
+                    },
+                  },
+                  dataLabels: {
+                    enabled: true,
+                    style: {
+                      colors: ["#FFFFFF"],
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                    },
+                  },
+                  xaxis: {
+                    categories: ['Números', 'Vocales', 'Abecedario', 'Palabras'],
+                    labels: {
+                      style: {
+                        colors: "#6B7280",
+                        fontSize: "12px",
+                      },
+                    },
+                  },
+                  yaxis: {
+                    title: {
+                      text: "Elementos Únicos",
+                      style: {
+                        color: "#6B7280",
+                      },
+                    },
+                    labels: {
+                      style: {
+                        colors: "#6B7280",
+                      },
+                    },
+                  },
+                  grid: {
+                    borderColor: "#E5E7EB",
+                  },
+                  tooltip: {
+                    y: {
+                      formatter: (value: number) => `${value} elementos`,
+                    },
+                  },
+                } as ApexOptions}
+                series={[
+                  {
+                    name: "Elementos Entrenados",
+                    data: ['Numeros', 'Vocales', 'Abecedario', 'Palabras'].map(category => {
+                      const categoryStats = dbStats.filter(stat => stat.category === category);
+                      return categoryStats.length;
+                    }),
+                  },
+                ]}
+                type="bar"
+                height={350}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

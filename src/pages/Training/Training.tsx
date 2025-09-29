@@ -87,22 +87,20 @@ export default function Training({type, arr=[]}: TrainingProps) {
 	}, []);
 
 	const handleLandmarksDetected = useCallback((landmarks: Array<{ x: number; y: number; z: number }>) => {
-		if (landmarks.length > 0) {
-			setCurrentLandmarks(landmarks);
-		}
+		setCurrentLandmarks(landmarks);
 	}, []);
 
 	const stopCollection = () => {
+		console.log(`🛑 [Stop] Stopping collection - resetting all timers`);
 		setIsCollecting(false);
 		setCollectionStep('waiting');
 		setCountdown(3);
-		setCollectionTimer(10);
+		setCollectionTimer(10); // Reset collection timer
 		setCollectedSamples(0);
 		setCurrentLandmarks([]);
 		setSessionId('');
 		console.log('Recolección detenida');
 	};
-
 	// Efecto para manejar el cronómetro inicial de 3 segundos
 	useEffect(() => {
 		let timer: number;
@@ -115,7 +113,8 @@ export default function Training({type, arr=[]}: TrainingProps) {
 			} else {
 				// Cronómetro completado, iniciar recolección
 				setCollectionStep('collecting');
-				console.log(`Iniciando recolección de datos para elemento: ${selectedElement}`);
+				setCollectionTimer(10); // Reset timer to 10 seconds
+				console.log(`Iniciando recolección de datos para elemento: ${selectedElement} - Timer reseteado a 10s`);
 			}
 		}
 
@@ -124,16 +123,22 @@ export default function Training({type, arr=[]}: TrainingProps) {
 		};
 	}, [isCollecting, collectionStep, countdown, handDetected, selectedElement]);
 
-	// Simplified data collection effect
+	// Collection timer effect - runs for exactly 10 seconds regardless of hand detection
 	useEffect(() => {
 		let timer: number;
+		
+		console.log(`🔍 [Timer Debug] isCollecting: ${isCollecting}, collectionStep: ${collectionStep}, collectionTimer: ${collectionTimer}`);
 
-		if (isCollecting && collectionStep === 'collecting' && handDetected && collectionTimer > 0) {
+		if (isCollecting && collectionStep === 'collecting' && collectionTimer > 0) {
+			console.log(`✅ [Timer] Setting timeout for ${collectionTimer}s → ${collectionTimer - 1}s`);
 			timer = setTimeout(() => {
-				setCollectionTimer(collectionTimer - 1);
+				const newTime = collectionTimer - 1;
+				console.log(`⏱️ [Timer] Collection timer: ${newTime}s remaining (was ${collectionTimer}s)`);
+				setCollectionTimer(newTime);
 			}, 1000);
 		} else if (isCollecting && collectionStep === 'collecting' && collectionTimer === 0) {
 			// Collection completed
+			console.log(`🏁 [Timer] Timer reached 0 - completing collection`);
 			setCollectionStep('completed');
 			console.log(`🎉 Recolección completada para elemento: ${selectedElement}. ${collectedSamples} muestras guardadas.`);
 
@@ -148,6 +153,8 @@ export default function Training({type, arr=[]}: TrainingProps) {
 
 					if (elementData.length > 0) {
 						console.log(`✅ Se guardaron ${elementData[0].count} muestras para ${type}-${selectedElement}`);
+						// Update trained elements set
+						setTrainedElements(prev => new Set([...prev, selectedElement!]));
 					} else {
 						console.warn(`⚠️ No se encontraron datos guardados para ${type}-${selectedElement}`);
 					}
@@ -159,57 +166,28 @@ export default function Training({type, arr=[]}: TrainingProps) {
 					stopCollection();
 				}, 1000);
 			}, 200);
+		} else {
+			console.log(`❌ [Timer] Conditions not met - isCollecting: ${isCollecting}, step: ${collectionStep}, timer: ${collectionTimer}`);
 		}
 
 		return () => {
 			if (timer) clearTimeout(timer);
 		};
-	}, [isCollecting, collectionStep, collectionTimer, handDetected, selectedElement, type, collectedSamples]);
+	}, [isCollecting, collectionStep, collectionTimer]);
 
-	// Timer effect for collection countdown
-	useEffect(() => {
-		let timer: number;
-
-		if (isCollecting && collectionStep === 'collecting' && handDetected && collectionTimer > 0) {
-			timer = setTimeout(() => {
-				setCollectionTimer(collectionTimer - 1);
-			}, 1000);
-		} else if (isCollecting && collectionStep === 'collecting' && collectionTimer === 0) {
-			// Collection completed
-			setCollectionStep('completed');
-			// Verify saved data
-			setTimeout(async () => {
-				try {
-					const stats = await handLandmarksDB.getTrainingStats();
-					const elementData = stats.filter(s => s.category === type && s.element === selectedElement);
-					
-					if (elementData.length > 0) {
-						console.log(`✅ Guardadas ${elementData[0].count} muestras para ${type}-${selectedElement}`);
-						// Update trained elements set
-						setTrainedElements(prev => new Set([...prev, selectedElement!]));
-					}
-				} catch (error) {
-					console.error('Error verificando datos:', error);
-				}
-				
-				setTimeout(() => {
-					stopCollection();
-				}, 1000);
-			}, 200);
-		}
-
-		return () => {
-			if (timer) clearTimeout(timer);
-		};
-	}, [isCollecting, collectionStep, collectionTimer, handDetected, selectedElement, type, collectedSamples]);
 
 	// Simplified data collection using ref for current landmarks
 	const currentLandmarksRef = useRef<Array<{ x: number; y: number; z: number }>>([]);
+	const collectionTimerRef = useRef(10);
 	
-	// Update ref when landmarks change
+	// Update refs when values change
 	useEffect(() => {
 		currentLandmarksRef.current = currentLandmarks;
 	}, [currentLandmarks]);
+
+	useEffect(() => {
+		collectionTimerRef.current = collectionTimer;
+	}, [collectionTimer]);
 
 	// Data collection interval effect
 	useEffect(() => {
@@ -231,7 +209,11 @@ export default function Training({type, arr=[]}: TrainingProps) {
 							sessionId
 						);
 						
-						setCollectedSamples(prev => prev + 1);
+						setCollectedSamples(prev => {
+							const newCount = prev + 1;
+							console.log(`📊 [Collection] Muestra ${newCount} guardada para ${selectedElement} (${collectionTimerRef.current}s restantes)`);
+							return newCount;
+						});
 						
 					} catch (error) {
 						console.error('Error saving training data:', error);
@@ -381,7 +363,7 @@ export default function Training({type, arr=[]}: TrainingProps) {
 
 
         		{/* Overlay para recolección */}
-        		{isCollecting && collectionStep !== 'collecting' && (
+        		{isCollecting && (
         			<div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20 rounded-2xl">
         				<div className="bg-transparent rounded-xl p-8 text-center">
         					{collectionStep === 'waiting' && (
@@ -415,7 +397,28 @@ export default function Training({type, arr=[]}: TrainingProps) {
         						</div>
         					)}
 
-
+        					{collectionStep === 'collecting' && (
+        						<div>
+        							<div className="text-4xl font-bold text-green-600 dark:text-green-400 mb-4 animate-pulse">
+        								🔄
+        							</div>
+        							<div className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
+        								¡Recolectando datos!
+        							</div>
+        							<div className="text-lg text-gray-600 dark:text-gray-400 mb-2">
+        								{collectionTimer}s restantes
+        							</div>
+        							<div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        								{collectedSamples} muestras guardadas
+        							</div>
+        							<div className="w-48 h-2 bg-gray-200 rounded-full mx-auto">
+        								<div 
+        									className="h-full bg-green-500 rounded-full transition-all duration-1000 ease-out"
+        									style={{ width: `${((10 - collectionTimer) / 10) * 100}%` }}
+        								/>
+        							</div>
+        						</div>
+        					)}
 
         					{collectionStep === 'completed' && (
         						<div>
