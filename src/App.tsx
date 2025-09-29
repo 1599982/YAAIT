@@ -21,6 +21,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import Training from "./pages/Training/Training";
 import Predict from "./pages/Predict/Predict";
 import ProgresoAprendizaje from "./pages/Dashboard/ProgresoAprendizaje";
+import { TeacherProtectedRoute } from "./components/common/TeacherProtectedRoute";
 
 export default function App() {
   return (
@@ -31,10 +32,10 @@ export default function App() {
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
             <Route index path="/" element={<ProgresoAprendizaje />} />
-            <Route index path="/allenamiento/numeri" element={<Training type="Numeros" arr={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]} />} />
-            <Route index path="/allenamiento/vocales" element={<Training type="Vocales" arr={["A", "E", "I", "O", "U"]} />} />
-            <Route index path="/allenamiento/abecedario" element={<Training type="Abecedario" arr={["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]} />} />
-            <Route index path="/allenamiento/palore" element={<Training type="Palabras" arr={[]} />} />
+            <Route index path="/allenamiento/numeri" element={<TeacherProtectedRoute><Training type="Numeros" arr={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]} /></TeacherProtectedRoute>} />
+            <Route index path="/allenamiento/vocales" element={<TeacherProtectedRoute><Training type="Vocales" arr={["A", "E", "I", "O", "U"]} /></TeacherProtectedRoute>} />
+            <Route index path="/allenamiento/abecedario" element={<TeacherProtectedRoute><Training type="Abecedario" arr={["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]} /></TeacherProtectedRoute>} />
+            <Route index path="/allenamiento/palore" element={<TeacherProtectedRoute><Training type="Palabras" arr={[]} /></TeacherProtectedRoute>} />
 
             <Route index path="/previsione/numeri" element={<Predict type="Numeros" arr={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]} op={true} />} />
             <Route index path="/previsione/vocales" element={<Predict type="Vocales" arr={["A", "E", "I", "O", "U"]} />} />

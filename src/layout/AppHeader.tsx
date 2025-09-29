@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
+import { useUserMode } from "../context/UserModeContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
+import handLandmarksDB from "../services/database";
 
 const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-
+  const { toggleMode, isTeacher } = useUserMode();
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
   const handleToggle = () => {
@@ -82,6 +84,59 @@ const AppHeader: React.FC = () => {
             )}
             {/* Cross Icon */}
           </button>
+
+          {/* User Mode Toggle Button */}
+          <button
+            onClick={toggleMode}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+          >
+            <span className="text-xs">{isTeacher ? '👨‍🏫' : '👨‍🎓'}</span>
+            <span>{isTeacher ? 'Profesor' : 'Alumno'}</span>
+          </button>
+
+          {/* Reset DB Button - Only visible for teachers */}
+          {isTeacher && (
+            <button
+              onClick={async () => {
+                if (window.confirm('¿Estás seguro de que quieres resetear completamente la base de datos? Esto eliminará todos los datos de entrenamiento.')) {
+                  try {
+                    console.log('🔄 Resetting database...');
+                    
+                    // Delete and recreate database
+                    await handLandmarksDB.deleteDatabase();
+                    console.log('🗑️ Database deleted');
+                    
+                    // Wait for deletion to complete
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Reinitialize
+                    await handLandmarksDB.ensureDB();
+                    console.log('✅ Database recreated');
+                    
+                    // Verify it worked
+                    const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
+                    console.log('📊 New database status:', dbStatus);
+                    
+                    if (dbStatus.isValid) {
+                      console.log('🎉 Database reset completed successfully');
+                      alert('Base de datos reseteada exitosamente! Ahora puedes entrenar elementos.');
+                      // Reload the page to refresh all data
+                      window.location.reload();
+                    } else {
+                      throw new Error(`Database still invalid after reset: ${dbStatus.error}`);
+                    }
+                  } catch (error) {
+                    console.error('❌ Database reset failed:', error);
+                    alert(`Error al resetear la base de datos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <span className="text-xs">🔄</span>
+              <span>Reset DB</span>
+            </button>
+          )}
 
           <Link to="/" className="lg:hidden">
             <img

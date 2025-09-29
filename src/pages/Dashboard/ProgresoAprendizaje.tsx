@@ -7,6 +7,7 @@ import { ApexOptions } from "apexcharts";
 
 export default function ProgresoAprendizaje() {
   const navigate = useNavigate();
+  // UserMode context available but not used in this component currently
   const [dbStats, setDbStats] = useState<DatabaseStats[]>([]);
   const [, setTotalRecords] = useState(0);
 
@@ -272,52 +273,6 @@ export default function ProgresoAprendizaje() {
           </div>
         </div>
 
-        {/* Database Management */}
-        <div className="mt-8 text-center space-x-4">
-          <button
-            onClick={async () => {
-              if (window.confirm('¿Estás seguro de que quieres resetear completamente la base de datos? Esto eliminará todos los datos de entrenamiento.')) {
-                try {
-                  console.log('🔄 Resetting database...');
-                  
-                  // Delete and recreate database
-                  await handLandmarksDB.deleteDatabase();
-                  console.log('🗑️ Database deleted');
-                  
-                  // Wait for deletion to complete
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                  
-                  // Reinitialize
-                  await handLandmarksDB.ensureDB();
-                  console.log('✅ Database recreated');
-                  
-                  // Verify it worked
-                  const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
-                  console.log('📊 New database status:', dbStatus);
-                  
-                  if (dbStatus.isValid) {
-                    // Reload stats
-                    const stats = await handLandmarksDB.getTrainingStats();
-                    const size = await handLandmarksDB.getDatabaseSize();
-                    setDbStats(stats);
-                    setTotalRecords(size);
-                    
-                    console.log('🎉 Database reset completed successfully');
-                    alert('Base de datos reseteada exitosamente! Ahora puedes entrenar elementos.');
-                  } else {
-                    throw new Error(`Database still invalid after reset: ${dbStatus.error}`);
-                  }
-                } catch (error) {
-                  console.error('❌ Database reset failed:', error);
-                  alert(`Error al resetear la base de datos: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                }
-              }
-            }}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            🔄 Reset DB
-          </button>
-        </div>
 
         {/* Charts Section */}
         {dbStats.length > 0 && (
