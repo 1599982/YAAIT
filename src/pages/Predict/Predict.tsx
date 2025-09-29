@@ -66,22 +66,45 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 			return null;
 		}
 
-		// Simple distance-based prediction
-		let bestMatch = { element: '', distance: Infinity, confidence: 0 };
+		// Normalize current landmarks to vectors
+		const currentVectors = landmarksToVectors(currentLandmarks);
+		if (!currentVectors) return null;
+
+		// Calculate confidence for each element by comparing with all samples
+		const elementScores = new Map<string | number, { scores: number[], avgScore: number }>();
 		
 		for (const record of trainingData) {
-			const distance = calculateLandmarkDistance(currentLandmarks, record.landmarks);
-			if (distance < bestMatch.distance) {
+			const recordVectors = landmarksToVectors(record.landmarks);
+			if (!recordVectors) continue;
+
+			const similarity = calculateVectorSimilarity(currentVectors, recordVectors);
+			
+			if (!elementScores.has(record.element)) {
+				elementScores.set(record.element, { scores: [], avgScore: 0 });
+			}
+			
+			elementScores.get(record.element)!.scores.push(similarity);
+		}
+
+		// Calculate average scores and find best match
+		let bestMatch = { element: '', confidence: 0 };
+		
+		for (const [element, data] of elementScores) {
+			// Use average of top 70% scores to reduce noise
+			const sortedScores = data.scores.sort((a, b) => b - a);
+			const topScores = sortedScores.slice(0, Math.ceil(sortedScores.length * 0.7));
+			const avgScore = topScores.reduce((sum, score) => sum + score, 0) / topScores.length;
+			
+			if (avgScore > bestMatch.confidence) {
 				bestMatch = {
-					element: String(record.element),
-					distance,
-					confidence: Math.max(0, Math.min(100, 100 - (distance * 100)))
+					element: String(element),
+					confidence: avgScore
 				};
 			}
 		}
 
 		// Only return prediction if confidence is above threshold
-		if (bestMatch.confidence > 30) {
+		if (bestMatch.confidence > 35) {
 			return bestMatch;
 		}
 		
@@ -111,18 +134,64 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 
 
 
-	const calculateLandmarkDistance = (landmarks1: Array<{ x: number; y: number; z: number }>, landmarks2: Array<{ x: number; y: number; z: number }>) => {
-		if (landmarks1.length !== landmarks2.length) return Infinity;
+	const landmarksToVectors = (landmarks: Array<{ x: number; y: number; z: number }>) => {
+		if (landmarks.length !== 21) return null;
 		
-		let totalDistance = 0;
-		for (let i = 0; i < landmarks1.length; i++) {
-			const dx = landmarks1[i].x - landmarks2[i].x;
-			const dy = landmarks1[i].y - landmarks2[i].y;
-			const dz = landmarks1[i].z - landmarks2[i].z;
-			totalDistance += Math.sqrt(dx * dx + dy * dy + dz * dz);
+		// Key finger vectors for hand shape recognition
+		const vectors = [];
+		
+		// Finger tip to base vectors
+		const fingerTips = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky
+		const fingerBases = [2, 5, 9, 13, 17];
+		
+		for (let i = 0; i < fingerTips.length; i++) {
+			const tip = landmarks[fingerTips[i]];
+			const base = landmarks[fingerBases[i]];
+			vectors.push({
+				x: tip.x - base.x,
+				y: tip.y - base.y,
+				z: tip.z - base.z
+			});
 		}
 		
-		return totalDistance / landmarks1.length;
+		// Palm vectors (between finger bases)
+		for (let i = 0; i < fingerBases.length - 1; i++) {
+			const p1 = landmarks[fingerBases[i]];
+			const p2 = landmarks[fingerBases[i + 1]];
+			vectors.push({
+				x: p2.x - p1.x,
+				y: p2.y - p1.y,
+				z: p2.z - p1.z
+			});
+		}
+		
+		// Normalize vectors
+		return vectors.map(v => {
+			const magnitude = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+			return magnitude > 0 ? {
+				x: v.x / magnitude,
+				y: v.y / magnitude,
+				z: v.z / magnitude
+			} : { x: 0, y: 0, z: 0 };
+		});
+	};
+
+	const calculateVectorSimilarity = (vectors1: Array<{ x: number; y: number; z: number }>, vectors2: Array<{ x: number; y: number; z: number }>) => {
+		if (vectors1.length !== vectors2.length) return 0;
+		
+		let totalSimilarity = 0;
+		for (let i = 0; i < vectors1.length; i++) {
+			// Calculate dot product (cosine similarity)
+			const dotProduct = vectors1[i].x * vectors2[i].x + 
+							  vectors1[i].y * vectors2[i].y + 
+							  vectors1[i].z * vectors2[i].z;
+			
+			// Convert to percentage (dot product ranges from -1 to 1)
+			const similarity = (dotProduct + 1) * 50;
+			totalSimilarity += similarity;
+		}
+		
+		return totalSimilarity / vectors1.length;
 	};
 
   return (
@@ -140,14 +209,14 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	            </div>
 
 	            <div className="mt-5">
-	              <Badge color={confidence > 70 ? "success" : confidence > 40 ? "warning" : "error"}>
+	              <Badge color={confidence > 60 ? "success" : confidence > 35 ? "warning" : "error"}>
 	                <ArrowUpIcon />
 	                {confidence.toFixed(1)}% {currentPrediction && `- ${currentPrediction}`}
 	              </Badge>
 	              <div className="w-full h-3 bg-gray-100 rounded-xl mt-1.5 overflow-hidden">
 	                <div
 	                  className={`h-full rounded-xl transition-all duration-300 ease-out ${
-	                    confidence > 70 ? 'bg-green-500' : confidence > 40 ? 'bg-yellow-500' : 'bg-red-500'
+	                    confidence > 60 ? 'bg-green-500' : confidence > 35 ? 'bg-yellow-500' : 'bg-red-500'
 	                  }`}
 	                  style={{ width: `${confidence}%` }}
 	                ></div>
@@ -155,9 +224,9 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	            </div>
 
 	            {/* Current Prediction Display */}
-	            {currentPrediction && handDetected && (
+	            {currentPrediction && handDetected && confidence > 35 && (
 	              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
-	                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+	                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
 	                  {currentPrediction}
 	                </div>
 	                <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -169,7 +238,7 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	            {!handDetected && (
 	              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
 	                <div className="text-gray-500 dark:text-gray-400">
-	                  No se detecta mano
+	                  Muestra tu mano frente a la cámara
 	                </div>
 	              </div>
 	            )}

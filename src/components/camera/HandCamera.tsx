@@ -105,10 +105,7 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
 
     const loadMediaPipe = (): Promise<void> => {
       return new Promise((resolve, reject) => {
-        console.log('🔄 [HandCamera] Loading MediaPipe...');
-        
         if (window.Hands) {
-          console.log('✅ [HandCamera] MediaPipe already loaded');
           setMediaPipeLoaded(true);
           resolve();
           return;
@@ -117,45 +114,33 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
         script.onload = () => {
-          console.log('📦 [HandCamera] MediaPipe script loaded, checking availability...');
           setTimeout(() => {
             if (window.Hands) {
-              console.log('✅ [HandCamera] MediaPipe Hands available');
               setMediaPipeLoaded(true);
               resolve();
             } else {
-              console.error('❌ [HandCamera] MediaPipe Hands not available after loading');
               reject(new Error('MediaPipe failed to load'));
             }
           }, 1000);
         };
-        script.onerror = () => {
-          console.error('❌ [HandCamera] Failed to load MediaPipe script');
-          reject(new Error('Failed to load MediaPipe'));
-        };
+        script.onerror = () => reject(new Error('Failed to load MediaPipe'));
         document.head.appendChild(script);
       });
     };
 
     const setupHandDetection = (): void => {
-      console.log('🏗️ [HandCamera] Setting up hand detection...');
-      
       const hands = new window.Hands({
         locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       });
 
-      const options = {
+      hands.setOptions({
         maxNumHands: mode === 'training' ? 1 : 2,
         modelComplexity: 1,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
-      };
-      
-      console.log('⚙️ [HandCamera] Setting MediaPipe options:', options);
-      hands.setOptions(options);
+      });
 
       hands.onResults((results: MediaPipeResults) => {
-        console.log(`🎥 [HandCamera] MediaPipe results received - Processing: ${isProcessing}`);
         if (!isProcessing) {
           setIsProcessing(true);
           drawResults(results);
@@ -164,7 +149,6 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
       });
 
       handsRef.current = hands;
-      console.log('✅ [HandCamera] MediaPipe hands instance created');
 
       const processFrame = async (): Promise<void> => {
         if (!videoRef.current || !handsRef.current) {
@@ -176,32 +160,21 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
           try {
             await handsRef.current.send({ image: videoRef.current });
           } catch (error) {
-            console.warn('⚠️ [HandCamera] Frame processing error:', error);
+            console.warn('Frame processing error:', error);
           }
-        } else {
-          console.log(`📹 [HandCamera] Video not ready, readyState: ${videoRef.current.readyState}`);
         }
 
         animationRef.current = requestAnimationFrame(processFrame);
       };
 
-      console.log('🎬 [HandCamera] Starting frame processing loop');
       processFrame();
     };
 
     const drawResults = (results: MediaPipeResults): void => {
-      console.log(`🎨 [HandCamera] drawResults called`, {
-        hasMultiHandLandmarks: !!(results.multiHandLandmarks),
-        landmarksCount: results.multiHandLandmarks?.length || 0
-      });
-      
       const canvas = canvasRef.current;
       const video = videoRef.current;
 
-      if (!canvas || !video) {
-        console.log(`⚠️ [HandCamera] Missing canvas or video element`);
-        return;
-      }
+      if (!canvas || !video) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -218,35 +191,16 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
 
       // Notificar detección de manos al componente padre
       const handsDetected = !!(results.multiHandLandmarks && results.multiHandLandmarks.length > 0);
-      console.log(`👋 [HandCamera] Hand detection status: ${handsDetected}`);
       
       if (onHandDetected) {
-        console.log(`📡 [HandCamera] Calling onHandDetected with: ${handsDetected}`);
         onHandDetected(handsDetected);
-      } else {
-        console.log(`⚠️ [HandCamera] onHandDetected callback not provided`);
       }
 
       // Enviar landmarks normalizados al componente padre
       if (handsDetected && results.multiHandLandmarks && onLandmarksDetected) {
         // Tomar solo la primera mano detectada para entrenamiento
         const landmarks = results.multiHandLandmarks[0];
-        console.log(`📤 [HandCamera] Sending ${landmarks.length} landmarks to parent component`);
-        console.log(`🔍 [HandCamera] First landmark sample:`, {
-          x: landmarks[0].x,
-          y: landmarks[0].y,
-          z: landmarks[0].z
-        });
-        console.log(`🔍 [HandCamera] Callback function exists: ${typeof onLandmarksDetected}`);
         onLandmarksDetected(landmarks);
-        console.log(`✅ [HandCamera] Landmarks sent successfully`);
-      } else {
-        console.log(`⚠️ [HandCamera] Not sending landmarks:`, {
-          handsDetected,
-          hasMultiHandLandmarks: !!results.multiHandLandmarks,
-          hasCallback: !!onLandmarksDetected,
-          callbackType: typeof onLandmarksDetected
-        });
       }
 
       if (results.multiHandLandmarks) {
@@ -254,31 +208,41 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
         ctx.scale(-1, 1);
         ctx.translate(-canvas.width, 0);
 
-        if (window.drawLandmarks && window.drawConnectors && window.HAND_CONNECTIONS) {
-          for (const landmarks of results.multiHandLandmarks) {
-            window.drawConnectors(ctx, landmarks, window.HAND_CONNECTIONS, {
-              color: '#00FF00',
-              lineWidth: 2
-            });
+        // Dibujar conexiones de manos
+        for (const landmarks of results.multiHandLandmarks) {
+          // Conexiones de MediaPipe para manos
+          const HAND_CONNECTIONS = [
+            [0, 1], [1, 2], [2, 3], [3, 4], // Pulgar
+            [0, 5], [5, 6], [6, 7], [7, 8], // Índice
+            [0, 9], [9, 10], [10, 11], [11, 12], // Medio
+            [0, 13], [13, 14], [14, 15], [15, 16], // Anular
+            [0, 17], [17, 18], [18, 19], [19, 20], // Meñique
+            [5, 9], [9, 13], [13, 17] // Conexiones entre dedos
+          ];
 
-            window.drawLandmarks(ctx, landmarks, {
-              color: '#00FF00',
-              lineWidth: 2,
-              radius: 3
-            });
+          // Dibujar conexiones
+          ctx.strokeStyle = '#00FF00';
+          ctx.lineWidth = 2;
+          for (const [start, end] of HAND_CONNECTIONS) {
+            const startPoint = landmarks[start];
+            const endPoint = landmarks[end];
+            
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x * canvas.width, startPoint.y * canvas.height);
+            ctx.lineTo(endPoint.x * canvas.width, endPoint.y * canvas.height);
+            ctx.stroke();
           }
-        } else {
-          ctx.fillStyle = '#00FF00';
-          for (const landmarks of results.multiHandLandmarks) {
-            for (const landmark of landmarks) {
-              ctx.beginPath();
-              ctx.arc(
-                landmark.x * canvas.width,
-                landmark.y * canvas.height,
-                4, 0, 2 * Math.PI
-              );
-              ctx.fill();
-            }
+
+          // Dibujar puntos de landmarks
+          ctx.fillStyle = '#FF0000';
+          for (const landmark of landmarks) {
+            ctx.beginPath();
+            ctx.arc(
+              landmark.x * canvas.width,
+              landmark.y * canvas.height,
+              3, 0, 2 * Math.PI
+            );
+            ctx.fill();
           }
         }
 
