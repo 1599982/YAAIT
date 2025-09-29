@@ -198,9 +198,18 @@ const HandCamera: React.FC<HandCameraProps> = ({ mode, onHandDetected, onLandmar
 
       // Enviar landmarks normalizados al componente padre
       if (handsDetected && results.multiHandLandmarks && onLandmarksDetected) {
-        // Tomar solo la primera mano detectada para entrenamiento
-        const landmarks = results.multiHandLandmarks[0];
-        onLandmarksDetected(landmarks);
+        if (mode === 'training') {
+          // Para entrenamiento, solo la primera mano
+          const landmarks = results.multiHandLandmarks[0];
+          onLandmarksDetected(landmarks);
+        } else {
+          // Para predicción, procesar ambas manos con handedness
+          results.multiHandLandmarks.forEach((landmarks, index) => {
+            const handedness = results.multiHandedness?.[index]?.label as 'Left' | 'Right' | undefined;
+            console.log(`🖐️ [HandCamera] Detected hand ${index}: ${handedness || 'unknown'} with ${landmarks.length} landmarks`);
+            onLandmarksDetected(landmarks, handedness);
+          });
+        }
       }
 
       if (results.multiHandLandmarks) {

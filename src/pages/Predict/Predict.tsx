@@ -133,16 +133,32 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	}, [type]);
 
 	const handleLandmarksDetected = useCallback(async (landmarks: Array<{ x: number; y: number; z: number }>, handedness?: 'Left' | 'Right') => {
+		console.log(`🖐️ [Predict] Hand detected - Handedness: ${handedness || 'undefined'}, Landmarks: ${landmarks.length}`);
+		
 		if (landmarks.length > 0) {
-			// Detect right hand open/closed
+			// Always detect right hand open/closed status
 			if (handedness === 'Right') {
+				console.log(`👉 [Predict] Processing RIGHT hand`);
 				const isOpen = detectHandOpenClosed(landmarks);
+				console.log(`👉 [Predict] Right hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
+				const wasOpen = rightHandOpen;
 				setRightHandOpen(isOpen);
-				return; // Don't process right hand for predictions
-			}
-			
-			// Handle left hand predictions (default for single hand or left hand)
-			if (!handedness || handedness === 'Left') {
+				
+				// If right hand just closed and we have a good prediction, set timeout to add to text
+				if (wasOpen && !isOpen && currentPrediction && confidence >= 60 && (type === 'Numeros' || type === 'Abecedario')) {
+					if (pendingTimeout) {
+						clearTimeout(pendingTimeout);
+					}
+					
+					const timeout = window.setTimeout(() => {
+						setFormedText(prev => prev + currentPrediction);
+						setPendingTimeout(null);
+					}, 1000);
+					
+					setPendingTimeout(timeout);
+				}
+				
+				// Also handle predictions for right hand (element detection)
 				try {
 					const prediction = await predictFromLandmarks(landmarks);
 					if (prediction) {
@@ -161,8 +177,38 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 					console.error('Error making prediction:', error);
 				}
 			}
+			
+			// Handle predictions for left hand or single hand mode (backup)
+			if (!handedness || handedness === 'Left') {
+				console.log(`👈 [Predict] Processing LEFT hand or single hand mode`);
+				try {
+					const prediction = await predictFromLandmarks(landmarks);
+					if (prediction) {
+						setCurrentPrediction(prediction.element);
+						setConfidence(prediction.confidence);
+						
+						// Add to history only for non-word-forming modes
+						if (type !== 'Numeros' && type !== 'Abecedario') {
+							setPredictionHistory(prev => [
+								{ prediction: prediction.element, confidence: prediction.confidence, timestamp: Date.now() },
+								...prev.slice(0, 9) // Keep last 10 predictions
+							]);
+						}
+					}
+				} catch (error) {
+					console.error('Error making prediction:', error);
+				}
+			}
+			
+			// If no handedness detected, try to detect right hand state anyway
+			if (!handedness) {
+				console.log(`❓ [Predict] No handedness detected, trying to detect hand state anyway`);
+				const isOpen = detectHandOpenClosed(landmarks);
+				console.log(`❓ [Predict] Single hand is ${isOpen ? 'OPEN' : 'CLOSED'}`);
+				setRightHandOpen(isOpen);
+			}
 		}
-	}, [predictFromLandmarks, type]);
+	}, [predictFromLandmarks, type, rightHandOpen, pendingTimeout, currentPrediction, confidence]);
 
 
 
@@ -224,6 +270,31 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 		}
 		
 		return totalSimilarity / vectors1.length;
+	};
+
+	const detectHandOpenClosed = (landmarks: Array<{ x: number; y: number; z: number }>) => {
+		if (landmarks.length !== 21) return false;
+		
+		// Check if fingers are extended by comparing tip to base positions
+		const fingerTips = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky
+		const fingerBases = [3, 6, 10, 14, 18];
+		
+		let openFingers = 0;
+		
+		for (let i = 0; i < fingerTips.length; i++) {
+			const tip = landmarks[fingerTips[i]];
+			const base = landmarks[fingerBases[i]];
+			
+			// For thumb, check x-axis difference; for others, check y-axis
+			if (i === 0) {
+				if (Math.abs(tip.x - base.x) > 0.04) openFingers++;
+			} else {
+				if (tip.y < base.y - 0.02) openFingers++;
+			}
+		}
+		
+		// Hand is open if 3 or more fingers are extended
+		return openFingers >= 3;
 	};
 
   return (
@@ -297,13 +368,13 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 			            </div>
 			          </div>
 			          <div className="flex justify-between items-center col-span-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 md:gap-5">
-									<p></p>
-									{type !== "Numeros" && (
-										<div className="flex md:gap-3">
-						      		<Button size="sm" variant="primary">Espacio</Button>
-						      		<Button size="sm" variant="primary">Borrar</Button>
-										</div>
-									)}
+									<p className="text-lg font-medium text-gray-800 dark:text-white">{formedText}</p>
+									<div className="flex md:gap-3">
+										{type !== "Numeros" && (
+						      		<Button size="sm" variant="primary" onClick={() => setFormedText(prev => prev + ' ')}>Espacio</Button>
+										)}
+						      	<Button size="sm" variant="primary" onClick={() => setFormedText('')}>Borrar</Button>
+									</div>
 								</div>
 							</>
 						)}
