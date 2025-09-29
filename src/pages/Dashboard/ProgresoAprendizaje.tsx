@@ -8,7 +8,7 @@ import { ApexOptions } from "apexcharts";
 export default function ProgresoAprendizaje() {
   const navigate = useNavigate();
   const [dbStats, setDbStats] = useState<DatabaseStats[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
+  const [, setTotalRecords] = useState(0);
 
   useEffect(() => {
     // Initialize database and load stats
@@ -105,11 +105,26 @@ export default function ProgresoAprendizaje() {
     return Math.min((totalSamples / targetSamples) * 100, 100);
   };
 
-  const overallProgress = dbStats.length > 0 ? 
-    ['Numeros', 'Vocales', 'Abecedario', 'Palabras']
-      .map(cat => getCategoryProgress(cat))
-      .reduce((sum, progress) => sum + progress, 0) / 4 
-    : 0;
+  // Removed overallProgress as it's no longer used - now using totalTrainedElements
+
+  // Calcular total de elementos entrenados
+  const getTotalTrainedElements = () => {
+    if (dbStats.length === 0) return 0;
+    
+    return ['Numeros', 'Vocales', 'Abecedario', 'Palabras'].reduce((total, category) => {
+      const categoryStats = dbStats.filter(stat => stat.category === category);
+      return total + categoryStats.length;
+    }, 0);
+  };
+
+  const totalTrainedElements = getTotalTrainedElements();
+  
+  // Calcular total posible de elementos
+  const getTotalPossibleElements = () => {
+    return 10 + 5 + 26 + 0; // Números (0-9), Vocales (A,E,I,O,U), Abecedario (A-Z), Palabras (variable)
+  };
+
+  const totalPossibleElements = getTotalPossibleElements();
 
   return (
     <>
@@ -162,9 +177,11 @@ export default function ProgresoAprendizaje() {
             <div className="bg-white rounded-3xl p-8 shadow-lg h-full flex flex-col justify-center">
               <div className="mb-8">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-3">
-                  Modelos entrenados
+                  Elementos Entrenados
                 </h2>
-                <p className="text-gray-600 text-lg">Aprendiste un</p>
+                <p className="text-gray-600 text-lg">
+                  {totalTrainedElements} de {totalPossibleElements} elementos completados
+                </p>
               </div>
 
               {/* Gráfico circular */}
@@ -191,7 +208,7 @@ export default function ProgresoAprendizaje() {
                     strokeWidth="20"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 80}`}
-                    strokeDashoffset={`${2 * Math.PI * 80 * (1 - overallProgress / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 80 * (1 - (totalTrainedElements / totalPossibleElements))}`}
                     className="transition-all duration-1000 ease-out"
                     strokeLinecap="round"
                   />
@@ -200,10 +217,13 @@ export default function ProgresoAprendizaje() {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
                     <div className="text-4xl font-bold text-gray-800">
-                      {overallProgress.toFixed(1)}%
+                      {totalTrainedElements}
                     </div>
                     <div className="text-blue-500 text-lg font-semibold">
-                      {totalRecords} muestras
+                      elementos
+                    </div>
+                    <div className="text-gray-500 text-sm mt-1">
+                      {((totalTrainedElements / totalPossibleElements) * 100).toFixed(1)}% completado
                     </div>
                   </div>
                 </div>
@@ -212,13 +232,13 @@ export default function ProgresoAprendizaje() {
               {/* Estado */}
               <div className="text-center">
                 <span className={`inline-block px-6 py-3 rounded-full text-lg font-semibold ${
-                  overallProgress < 25 
+                  totalTrainedElements < 10 
                     ? 'bg-red-100 text-red-600' 
-                    : overallProgress < 75 
+                    : totalTrainedElements < 25 
                     ? 'bg-orange-100 text-orange-600' 
                     : 'bg-green-100 text-green-600'
                 }`}>
-                  {overallProgress < 25 ? 'Iniciando' : overallProgress < 75 ? 'En Proceso' : 'Avanzado'}
+                  {totalTrainedElements < 10 ? 'Iniciando' : totalTrainedElements < 25 ? 'En Proceso' : 'Avanzado'}
                 </span>
               </div>
 
@@ -252,51 +272,8 @@ export default function ProgresoAprendizaje() {
           </div>
         </div>
 
-        {/* Test and Cleanup Buttons for Database */}
+        {/* Database Management */}
         <div className="mt-8 text-center space-x-4">
-          <button
-            onClick={async () => {
-              try {
-                console.log('🧪 Testing database functionality...');
-                
-                // Verify database status first
-                const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
-                console.log('📊 Database status:', dbStatus);
-                
-                if (!dbStatus.isValid) {
-                  console.error('❌ Database invalid:', dbStatus.error);
-                  alert(`Base de datos inválida: ${dbStatus.error}. Usa el botón "Reset DB" para solucionarlo.`);
-                  return;
-                }
-                
-                // Test saving sample data
-                const sessionId = handLandmarksDB.generateSessionId();
-                const sampleLandmarks = Array.from({ length: 21 }, () => ({
-                  x: Math.random(),
-                  y: Math.random(),
-                  z: Math.random()
-                }));
-                
-                await handLandmarksDB.saveTrainingData('Test', 'Sample', sampleLandmarks, sessionId);
-                console.log('✅ Sample data saved successfully');
-                
-                // Reload stats
-                const stats = await handLandmarksDB.getTrainingStats();
-                const size = await handLandmarksDB.getDatabaseSize();
-                setDbStats(stats);
-                setTotalRecords(size);
-                
-                alert('Test completado exitosamente! Revisa la consola para más detalles.');
-              } catch (error) {
-                console.error('❌ Database test failed:', error);
-                alert(`Error en el test: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              }
-            }}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            🧪 Probar Base de Datos
-          </button>
-          
           <button
             onClick={async () => {
               if (window.confirm('¿Estás seguro de que quieres resetear completamente la base de datos? Esto eliminará todos los datos de entrenamiento.')) {
@@ -339,41 +316,6 @@ export default function ProgresoAprendizaje() {
             className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
             🔄 Reset DB
-          </button>
-          
-          <button
-            onClick={async () => {
-              try {
-                console.log('🔍 Checking database status...');
-                const dbStatus = await handLandmarksDB.verifyDatabaseStatus();
-                const size = await handLandmarksDB.getDatabaseSize();
-                const stats = await handLandmarksDB.getTrainingStats();
-                
-                console.log('📊 Complete database status:', {
-                  isValid: dbStatus.isValid,
-                  objectStores: dbStatus.objectStores,
-                  error: dbStatus.error,
-                  totalRecords: size,
-                  categories: stats.length
-                });
-                
-                const statusMessage = `
-Estado: ${dbStatus.isValid ? '✅ Válida' : '❌ Inválida'}
-Object Stores: ${dbStatus.objectStores.join(', ')}
-Total Registros: ${size}
-Categorías únicas: ${new Set(stats.map(s => s.category)).size}
-${dbStatus.error ? `Error: ${dbStatus.error}` : ''}
-                `.trim();
-                
-                alert(statusMessage);
-              } catch (error) {
-                console.error('❌ Status check failed:', error);
-                alert(`Error verificando estado: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              }
-            }}
-            className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            🔍 Verificar Estado
           </button>
         </div>
 

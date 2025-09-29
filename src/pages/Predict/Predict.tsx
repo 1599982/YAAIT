@@ -525,51 +525,36 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 	                <div className="text-sm text-gray-600 dark:text-gray-400">
 	                  Confianza: {confidence.toFixed(1)}%
 	                </div>
-	                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-	                  Mano Der: {rightHandDetected ? '✅' : '❌'} | Mano Izq: {leftHandOpen ? 'Abierta' : 'Cerrada'}
-	                </div>
-	                <div className="text-xs text-blue-500 dark:text-blue-400 mt-1">
-	                  Condiciones: Conf≥60% {confidence >= 60 ? '✅' : '❌'} | Izq Cerrada {!leftHandOpen ? '✅' : '❌'} | Tipo OK {(type === 'Numeros' || type === 'Abecedario') ? '✅' : '❌'}
-	                </div>
-	                {lastValidPrediction && (
-	                  <div className="text-xs text-green-500 dark:text-green-400 mt-1 font-bold">
-	                    💾 Predicción Válida Guardada: {lastValidPrediction.element} ({lastValidPrediction.confidence.toFixed(1)}%)
-	                  </div>
-	                )}
 	              </div>
 	            )}
 
-	            {!handDetected && (
-	              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-	                <div className="text-gray-500 dark:text-gray-400">
-	                  Muestra tu mano frente a la cámara
-	                </div>
-	              </div>
-	            )}
-	          </div>
-						{type !== "Vocales" && (
-							<>
-			          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-			            <div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
-			            	<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Control - Detección de mano abierta/cerrada</span></p>
-			            </div>
+			{!handDetected && (
+				<div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+				<div className="text-gray-500 dark:text-gray-400">
+					Muestra tu mano frente a la cámara
+				</div>
+				</div>
+			)}
+			</div>
+					{type !== "Vocales" && (
+						<>
+					<div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+					<div className="flex justify-between h-12 rounded-xl dark:bg-gray-800">
+						<p className="flex flex-col text-xl dark:text-white">Estado Mano Izquierda<span className="text-sm font-light text-gray-500">Control - Detección de mano abierta/cerrada</span></p>
+					</div>
 
-			            <div className="mt-5 flex items-center justify-center py-8">
-			              <div className="text-center">
-			                <div className={`text-6xl mb-4 ${leftHandOpen ? 'text-green-500' : 'text-red-500'}`}>
-			                  {leftHandOpen ? '✋' : '✊'}
-			                </div>
-			                <div className={`text-2xl font-bold mb-2 ${leftHandOpen ? 'text-green-600' : 'text-red-600'}`}>
-			                  {leftHandOpen ? 'ABIERTA' : 'CERRADA'}
-			                </div>
-			                <div className="text-sm text-gray-500 dark:text-gray-400">
-			                  Mano Izquierda
-                </div>
-                <div className="text-xs mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                  <div>Estado anterior: {lastLeftHandState === null ? 'null' : (lastLeftHandState ? 'ABIERTA' : 'CERRADA')}</div>
-                  <div>Puede insertar: {canInsert ? 'SÍ' : 'NO'}</div>
-                  <div>Ciclo completado: {hasInsertedInThisCycle ? 'SÍ' : 'NO'}</div>
-                </div>
+					<div className="mt-5 flex items-center justify-center py-8">
+						<div className="text-center">
+						<div className={`text-6xl mb-4 ${leftHandOpen ? 'text-green-500' : 'text-red-500'}`}>
+							{leftHandOpen ? '✋' : '✊'}
+						</div>
+						<div className={`text-2xl font-bold mb-2 ${leftHandOpen ? 'text-green-600' : 'text-red-600'}`}>
+							{leftHandOpen ? 'ABIERTA' : 'CERRADA'}
+						</div>
+						<div className="text-sm text-gray-500 dark:text-gray-400">
+							Mano Izquierda
+			</div>
+
 			              </div>
 			            </div>
 			          </div>
@@ -596,42 +581,6 @@ export default function Predict({type, arr=[], op=false}: TrainingProps) {
 						      		<Button size="sm" variant="primary" onClick={() => setFormedText(prev => prev + ' ')}>Espacio</Button>
 										)}
 										<Button size="sm" variant="primary" onClick={() => setFormedText('')}>Borrar</Button>
-										{lastValidPrediction && (
-											<Button 
-												size="sm" 
-												variant="outline" 
-												onClick={() => {
-													console.log(`🧪 [TEST] Manual insertion with prediction: ${lastValidPrediction.element}`);
-													if (canInsert && lastValidPrediction) {
-														// Insert immediately (convert operators if needed, evaluate if equals)
-														setFormedText(prev => {
-															// If it's "I" (equals), evaluate the current expression
-															if (lastValidPrediction.element === 'I') {
-																if (prev.trim()) {
-																	const result = evaluateExpression(prev);
-																	console.log(`🧪 [TEST] Evaluated expression "${prev}" = "${result}"`);
-																	return result;
-																} else {
-																	console.warn(`⚠️ [TEST] Cannot evaluate empty expression`);
-																	return prev;
-																}
-															} else {
-																// Normal insertion with operator conversion
-																const elementToInsert = ops[lastValidPrediction.element as keyof typeof ops] || lastValidPrediction.element;
-																return prev + elementToInsert;
-															}
-														});
-														// Clear prediction but DON'T disable insertion for manual test
-														validPredictionRef.current = null;
-														setLastValidPrediction(null);
-														// Keep canInsert = true for manual testing
-														console.log(`🧪 [TEST] Manual insertion completed, keeping insertion enabled for testing`);
-													}
-												}}
-											>
-												Insertar: {lastValidPrediction.element}
-											</Button>
-										)}
 									</div>
 								</div>
 							</>
